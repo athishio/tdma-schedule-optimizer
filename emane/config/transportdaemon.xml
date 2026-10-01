@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE transport SYSTEM "file:///usr/share/emane/dtd/transport.dtd">
+<!--
+  EMANE Transport Daemon Configuration Profile
+  =============================================
+  Creates a virtual TUN/TAP network interface (emane0) connecting host IP networking
+  to the underlying TDMA MAC emulation stack.
+-->
+<transport library="transvirtual">
+  <!--
+    device:
+    Virtual Ethernet TAP device name exposed to the operating system network stack.
+  -->
+  <param name="device" value="emane0"/>
+
+  <!--
+    bitrate:
+    Virtual interface data rate limit in bits per second (bps).
+    Set to '10000000' (10 Mbps) to match the over-the-air slot capacity.
+  -->
+  <param name="bitrate" value="10000000"/>
+
+  <!--
+    arpcacheenable:
+    Enables synthetic ARP translation in the emulator to prevent ARP request storms
+    from consuming scheduled TDMA slots.
+  -->
+  <param name="arpcacheenable" value="yes"/>
+</transport>

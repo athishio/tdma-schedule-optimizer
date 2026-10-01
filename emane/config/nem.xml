@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE nem SYSTEM "file:///usr/share/emane/dtd/nem.dtd">
+<!--
+  EMANE Network Emulation Module (NEM) Definition
+  ================================================
+  Binds the TDMA MAC layer and the Universal PHY layer into a unified transceiver stack.
+-->
+<nem>
+  <transport definition="transportdaemon.xml"/>
+  <mac definition="mac-tdmaeventschedule.xml"/>
+  <phy definition="phy-universal.xml"/>
+</nem>

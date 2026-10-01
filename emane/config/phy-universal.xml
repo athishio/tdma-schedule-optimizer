@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE phy SYSTEM "file:///usr/share/emane/dtd/phy.dtd">
+<!--
+  EMANE Universal Physical Layer (PHY) Configuration Profile
+  ===========================================================
+  Defines RF propagation characteristics, frequency spectrum,
+  transmit power, antenna gain, and receiver sensitivity.
+-->
+<phy>
+  <!--
+    frequency:
+    Center RF carrier frequency in Hertz (Hz).
+    Set to '2400000000' (2.4 GHz ISM band) for single-channel TDMA operation.
+  -->
+  <param name="frequency" value="2400000000"/>
+
+  <!--
+    bandwidth:
+    Channel RF bandwidth in Hertz (Hz).
+    Set to '20000000' (20.0 MHz channel bandwidth) typical of tactical 802.11 / OFDM waveforms.
+  -->
+  <param name="bandwidth" value="20000000"/>
+
+  <!--
+    frequencyofinterest:
+    Frequency spectrum processed by the receiver filter. Must match carrier frequency.
+  -->
+  <param name="frequencyofinterest" value="2400000000"/>
+
+  <!--
+    subid:
+    Sub-identifier for multi-transceiver NEM architectures. Set to '1' for primary transceiver.
+  -->
+  <param name="subid" value="1"/>
+
+  <!--
+    txpower:
+    Transmitter output power in decibel-milliwatts (dBm).
+    Set to '0.0' dBm (1.0 mW) calibrated with the 500 m free-space path loss threshold.
+  -->
+  <param name="txpower" value="0.0"/>
+
+  <!--
+    antennagain:
+    Isotropic antenna gain in dBi.
+    Set to '0.0' dBi representing an omnidirectional quarter-wave monopole antenna.
+  -->
+  <param name="antennagain" value="0.0"/>
+
+  <!--
+    systemnoisefigure:
+    Receiver system noise figure in decibels (dB).
+    Set to '4.0' dB representing low-noise amplifier (LNA) RF front-end degradation.
+  -->
+  <param name="systemnoisefigure" value="4.0"/>
+
+  <!--
+    propagationmodel:
+    Path loss calculation model.
+    Set to 'precomputed' or 'freespace' for deterministic 500 m line-of-sight attenuation.
+  -->
+  <param name="propagationmodel" value="freespace"/>
+</phy>

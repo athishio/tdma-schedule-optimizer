@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mac SYSTEM "file:///usr/share/emane/dtd/mac.dtd">
+<!--
+  EMANE TDMA Event Scheduler MAC Model Configuration Profile
+  =============================================================
+  Implements slot-synchronized TDMA medium access control.
+  Each parameter is configured for a 1 ms (1000 microsecond) slot duration.
+-->
+<mac library="tdmaeventschedulerradiomodel">
+  <!--
+    enablepromiscuousmode:
+    Controls whether the MAC delivers frames destined for other nodes to the upper layer.
+    Set to 'no' to simulate normal unicast filtering while allowing broadcast traffic.
+  -->
+  <param name="enablepromiscuousmode" value="no"/>
+
+  <!--
+    flowcontrolenable:
+    Enables flow control feedback between the MAC queue and the upstream transport layer.
+    Disabled ('no') to avoid synthetic backpressure artifacts in benchmark throughput tests.
+  -->
+  <param name="flowcontrolenable" value="no"/>
+
+  <!--
+    slotduration:
+    Length of an individual TDMA slot in microseconds (usec).
+    Value '1000' defines a 1.0 ms slot duration as specified by protocol requirements.
+  -->
+  <param name="slotduration" value="1000"/>
+
+  <!--
+    slotoverhead:
+    Guard interval and transceiver synchronization overhead in microseconds within each slot.
+    Set to '50' usec (5% of slot time) to accommodate propagation delay and RF ramp-up.
+  -->
+  <param name="slotoverhead" value="50"/>
+
+  <!--
+    pcrcurveuri:
+    URI pointing to the Packet Clear Rate (PCR) vs SINR curve file used by the model
+    to evaluate packet reception probability. Defaults to standard EMANE internal table.
+  -->
+  <param name="pcrcurveuri" value="file:///usr/share/emane/models/mac/tdmaeventscheduler/tdmabasemodelpcr.xml"/>
+
+  <!--
+    queue.strictdequeueenable:
+    Whether strict priority queueing is enforced when multiple traffic classes exist.
+    Set to 'no' for uniform round-robin transmission across standard traffic queues.
+  -->
+  <param name="queue.strictdequeueenable" value="no"/>
+
+  <!--
+    queue.depth:
+    Maximum number of packets retained in the MAC transmission queue before dropping.
+    Set to '256' packets to absorb traffic bursts without excessive bufferbloat latency.
+  -->
+  <param name="queue.depth" value="256"/>
+</mac>

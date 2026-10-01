@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE platform SYSTEM "file:///usr/share/emane/dtd/platform.dtd">
+<!--
+  EMANE Platform Configuration Profile for 16 Nodes
+  ==================================================
+  Instantiates 16 Network Emulation Modules (NEM 1 through 16)
+  communicating over a shared virtual OTA (Over-The-Air) multicast channel.
+-->
+<platform>
+  <param name="otamanagergroup" value="224.1.2.8:45703"/>
+  <param name="otamanagerdevice" value="eth0"/>
+  <param name="eventservicegroup" value="224.1.2.8:45703"/>
+  <param name="eventservicedevice" value="eth0"/>
+  <param name="controlportendpoint" value="0.0.0.0:47000"/>
+
+  <!-- NEM Instances for Nodes 01 through 16 -->
+  <nem id="1" definition="nem.xml"/>
+  <nem id="2" definition="nem.xml"/>
+  <nem id="3" definition="nem.xml"/>
+  <nem id="4" definition="nem.xml"/>
+  <nem id="5" definition="nem.xml"/>
+  <nem id="6" definition="nem.xml"/>
+  <nem id="7" definition="nem.xml"/>
+  <nem id="8" definition="nem.xml"/>
+  <nem id="9" definition="nem.xml"/>
+  <nem id="10" definition="nem.xml"/>
+  <nem id="11" definition="nem.xml"/>
+  <nem id="12" definition="nem.xml"/>
+  <nem id="13" definition="nem.xml"/>
+  <nem id="14" definition="nem.xml"/>
+  <nem id="15" definition="nem.xml"/>
+  <nem id="16" definition="nem.xml"/>
+</platform>
