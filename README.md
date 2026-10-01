@@ -1,7 +1,7 @@
 # TDMA Schedule Planner and Spatial Reuse Optimizer
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![Tests](https://img.shields.io/badge/tests-42%20passed-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-47%20passed-brightgreen.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A high-performance Python package and CLI for deterministic **TDMA (Time Division Multiple Access) Schedule Planning and Optimization** in multi-hop wireless networks. Built for wireless protocol development, featuring 5 distinct graph coloring heuristics, 2 exact solvers (Google OR-Tools CP-SAT and a pure-Python Branch-and-Bound fallback), an independent zero-trust schedule verifier, and an EMANE (Extendable Mobile Ad-hoc Network Emulator) translation bridge.
@@ -19,6 +19,7 @@ A high-performance Python package and CLI for deterministic **TDMA (Time Divisio
 - [8. Independent Verification Engine](#8-independent-verification-engine)
 - [9. Part 2: EMANE Emulation Bridge](#9-part-2-emane-emulation-bridge)
 - [10. Documentation Artifacts](#10-documentation-artifacts)
+- [11. Author](#11-author)
 
 ---
 
@@ -93,7 +94,8 @@ tdma-schedule-optimizer/
 │   ├── grid_4x4_300m.json         # 4x4 lattice topology (16 nodes, 300m)
 │   ├── sparse_linear_16.json      # Linear chain topology (16 nodes, 350m)
 │   ├── dense_cluster_16.json      # Dense clique topology (16 nodes, K_16)
-│   └── disconnected_clusters_16.json # Two 8-node clusters (3000m separation)
+│   ├── disconnected_clusters_16.json # Two 8-node clusters (3000m separation)
+│   └── grid_schedule.json         # Pre-computed 9-slot schedule JSON for grid (EMANE input)
 ├── tests/
 │   ├── test_graph.py              # Graph construction & 500m boundary tests
 │   ├── test_coloring.py           # Heuristics, spatial reuse, & determinism
@@ -107,12 +109,14 @@ tdma-schedule-optimizer/
 │   ├── config/                    # EMANE TDMA MAC, PHY, and NEM XML profiles
 │   └── bridge/
 │       ├── schedule_to_emane.py   # Schedule JSON to EMANE XML translator
+│       ├── publish_schedule.py    # Standalone EventService schedule publisher
 │       └── test_emane_bridge.py   # Round-trip schema parity tests
 └── docs/
     ├── DESIGN.md                  # Detailed engineering design document
     ├── design.pdf                 # Formatted PDF design document
     ├── PRESENTATION_OUTLINE.md    # 10-slide interview presentation outline
-    └── presentation.pptx          # PowerPoint slide deck
+    ├── presentation.pptx          # PowerPoint slide deck
+    └── WALKTHROUGH.md             # Codebase walkthrough & interview Q&A guide
 ```
 
 ---
@@ -237,7 +241,7 @@ The verification engine (`src/tdma/verify.py`) operates with zero trust:
 ```bash
 pytest -v
 ```
-All **42 unit, property, and integration tests** pass with 100% coverage.
+All **47 unit, property, and integration tests** pass with 100% coverage.
 
 ---
 
@@ -245,8 +249,10 @@ All **42 unit, property, and integration tests** pass with 100% coverage.
 
 The bridge converts optimized schedules into native EMANE configuration files:
 
+- **Schedule Artifact (`examples/grid_schedule.json`):** The repository provides `examples/grid_schedule.json`, containing the pre-computed, verified 9-slot schedule JSON for the 4x4 grid topology. The EMANE bridge accepts this artifact directly to produce valid XML configurations without re-running the solver.
+
 ```bash
-# Step 1: Optimize and export schedule
+# Step 1: Optimize and export schedule (or use pre-generated examples/grid_schedule.json)
 python -m tdma.cli --coords-file examples/grid_4x4_300m.json --export-json examples/grid_schedule.json
 
 # Step 2: Convert to EMANE XML & Python Event Script
@@ -268,3 +274,11 @@ python emane/bridge/schedule_to_emane.py \
 - **[design.pdf](docs/design.pdf):** Formatted PDF report generated via ReportLab.
 - **[PRESENTATION_OUTLINE.md](docs/PRESENTATION_OUTLINE.md):** 10-slide interview presentation outline.
 - **[presentation.pptx](docs/presentation.pptx):** 16:9 widescreen PowerPoint presentation generated via python-pptx.
+- **[WALKTHROUGH.md](docs/WALKTHROUGH.md):** Comprehensive code walkthrough and 15-question interview defense guide.
+
+---
+
+## 11. Author
+
+Athish M, athishm2007@gmail.com
+

@@ -57,18 +57,18 @@ class NumberedCanvas(canvas.Canvas):
 
         # Running Header (pages > 1)
         if self._pageNumber > 1:
-            self.drawString(45, letter[1] - 32, "TDMA Schedule Optimizer — Engineering Design Document")
+            self.drawString(38, letter[1] - 28, "TDMA Schedule Optimizer — Engineering Design Document")
             self.setStrokeColor(colors.HexColor("#CFD8DC"))
             self.setLineWidth(0.5)
-            self.line(45, letter[1] - 36, letter[0] - 45, letter[1] - 36)
+            self.line(38, letter[1] - 31, letter[0] - 38, letter[1] - 31)
 
         # Running Footer (all pages)
         self.setStrokeColor(colors.HexColor("#CFD8DC"))
         self.setLineWidth(0.5)
-        self.line(45, 36, letter[0] - 45, 36)
+        self.line(38, 30, letter[0] - 38, 30)
         page_str = f"Page {self._pageNumber} of {page_count}"
-        self.drawRightString(letter[0] - 45, 24, page_str)
-        self.drawString(45, 24, "CONFIDENTIAL — Take-Home Assignment / Protocol Development")
+        self.drawRightString(letter[0] - 38, 20, page_str)
+        self.drawString(38, 20, "CONFIDENTIAL — Take-Home Assignment / Protocol Development")
         self.restoreState()
 
 
@@ -76,10 +76,10 @@ def build_pdf(filename: str):
     doc = SimpleDocTemplate(
         filename,
         pagesize=letter,
-        rightMargin=45,
-        leftMargin=45,
-        topMargin=45,
-        bottomMargin=45,
+        rightMargin=38,
+        leftMargin=38,
+        topMargin=38,
+        bottomMargin=38,
     )
     styles = getSampleStyleSheet()
 
@@ -432,7 +432,7 @@ def build_pdf(filename: str):
             Paragraph("<b>VERIFIED</b>", table_cell_bold),
         ],
     ]
-    t_log = Table(emane_rows, colWidths=[1.4 * inch, 0.85 * inch, 1.4 * inch, 2.35 * inch, 0.65 * inch])
+    t_log = Table(emane_rows, colWidths=[1.5 * inch, 0.85 * inch, 1.45 * inch, 2.95 * inch, 0.65 * inch])
     t_log.setStyle(
         TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0D47A1")),
@@ -441,11 +441,23 @@ def build_pdf(filename: str):
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#CFD8DC")),
             ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F5F7FA")]),
-            ("TOPPADDING", (0, 0), (-1, -1), 2.2),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 2.2),
+            ("TOPPADDING", (0, 0), (-1, -1), 1.6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 1.6),
         ])
     )
     story.append(t_log)
+    story.append(Spacer(1, 4))
+
+    story.append(Paragraph("6.4 Radio Propagation & Range Modeling (Design Only / Untested)", h2_style))
+    story.append(Paragraph(
+        "EMANE's TDMA scheduler radio model does not have built-in knowledge of the discrete 500 m communication range limit. "
+        "Which virtual radios hear each other is determined strictly by node locations and RF pathloss (LocationEvent [ID 100] / PathlossEvent [ID 101]) "
+        "combined with receiver sensitivity and the propagation model (freespace / 2ray). To demonstrate spatial reuse in emulation, "
+        "virtual radios must be placed at the exact coordinates of the input topology and pathloss calibrated so the effective range is ~500 m; "
+        "otherwise all nodes hear each other globally and concurrent transmissions (e.g. Node_01 and Node_04 sharing Slot 8) would collide. "
+        "<i>Status: DESIGN ONLY / UNTESTED. Schedule XML generation and schema parity are fully tested offline; live RF propagation tuning and packet-level slot enforcement have not been executed on a live Linux kernel testbed.</i>",
+        body_style
+    ))
     story.append(Spacer(1, 4))
 
     # SECTION 7
@@ -510,7 +522,7 @@ def build_pptx(filename: str):
             current_top += Inches(0.45)
 
         if bullets:
-            bBox = slide.shapes.add_textbox(Inches(0.8), current_top, Inches(11.7), Inches(5.4 - (current_top - Inches(1.3))))
+            bBox = slide.shapes.add_textbox(Inches(0.8), current_top, Inches(11.7), Inches(5.2))
             btf = bBox.text_frame
             btf.word_wrap = True
             for idx, b in enumerate(bullets):
@@ -655,7 +667,7 @@ def build_pptx(filename: str):
             "• High-Fidelity Radio Emulation: Integrates with EMANE tdmaeventschedulerradiomodel (1 ms slots, 50 µs guard time).",
             "• Official Verification Log: 100% verified against Adjacent Link official documentation, XML schemas, and Python bindings.",
             "• Timing Architecture: Slot duration (1000 µs), overhead (50 µs), and bandwidth (20 MHz) defined in <structure> XML.",
-            "• Automated Translator (schedule_to_emane.py): Generates schema-compliant XML and dynamic Python Event scripts.",
+            "• Range Modeling (Design Only): EMANE uses LocationEvent (ID 100) / PathlossEvent (ID 101) & PCR curves to calibrate ~500 m range.",
             "• Tested vs Design-Only Boundary: Offline schema parsing and round-trip parity tested; live kernel RF execution documented.",
         ]
     )
@@ -679,7 +691,7 @@ def build_pptx(filename: str):
         "Production-Grade Protocol Implementation & Advanced Wireless Extensions",
         [
             "• Summary: Complete, hardened TDMA schedule planner with 5 heuristics, 2 exact solvers, and independent BFS verifier.",
-            "• Test Suite: 45 automated unit, property, CLI, and bridge tests passing with 100% pass rate.",
+            "• Test Suite: 47 automated unit, property, CLI, and bridge tests passing with 100% pass rate.",
             "• Multi-Channel TDMA (2D Grid): Joint time-frequency scheduling (t, f) across orthogonal RF channels.",
             "• Distributed MANET Scheduling: Implement decentralized slot negotiation (DRAND / C-TDMA) for mobile ad-hoc nodes.",
             "• Directed Spatial TDMA (STDMA): Move from omnidirectional reservations to link-oriented directional scheduling.",

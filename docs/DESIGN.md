@@ -281,6 +281,16 @@ The bridge module (`emane/bridge/schedule_to_emane.py`) implements a standalone 
 | **Python Event Class** | Python Class | `emane.events.TDMAScheduleEvent` | [tdmascheduleevent.py](https://github.com/adjacentlink/emane/blob/master/src/python/emane/events/tdmascheduleevent.py) | `class TDMAScheduleEvent(Event): IDENTIFIER = 105; def structure(self,**kwargs): ... def append(self,frameIndex,slotIndex,**kwargs):` (lines 38, 86, 163) | **VERIFIED** |
 | **Python Event Publisher** | Python Class | `emane.events.EventService` | [eventservice.py](https://github.com/adjacentlink/emane/blob/master/src/python/emane/events/eventservice.py) | `class EventService: def __init__(self,eventchannel,otachannel = None): (self._multicastGroup,self._port,_) = eventchannel; def publish(self,nemId,event):` (lines 127, 345) | **VERIFIED** |
 
+### 6.4 Radio Propagation & Range Modeling (Design Only / Untested)
+EMANE's TDMA scheduler radio model has no intrinsic knowledge of the discrete 500.0 m communication range constraint. In EMANE, which virtual radios hear each other is determined strictly by node locations and RF pathloss (location/pathloss events) combined with receiver sensitivity and antenna configuration.
+
+To demonstrate spatial reuse in an emulation:
+1. **Node Locations & Pathloss:** The emulation must place virtual radios at the exact coordinates defined in the Python topology input using `emane.events.LocationEvent` (Event ID 100) or by publishing explicit pathloss matrices via `emane.events.PathlossEvent` (Event ID 101).
+2. **Effective Range Calibration:** The physical layer's transmit power (`txpower = 0.0 dBm`), pathloss model (`propagationmodel = freespace` or `2ray`), and Packet Completion Rate curve (`tdmabasemodelpcr.xml`) must be configured so that the received SINR drops below the decoding threshold at distances exceeding approximately 500.0 meters.
+3. **Collision Risk Under Global Visibility:** If the emulation were executed without location/pathloss events or with an uncalibrated propagation model, all 16 virtual radios would hear one another globally across the multicast OTA channel (`224.1.2.8:45703`). Under global visibility, concurrent transmissions scheduled for nodes separated by $\ge 3$ hops (e.g., Node_01 and Node_04 sharing Slot 8 in the 4x4 grid) would collide at the PHY layer, causing packet drops that the graph model proves should not occur.
+
+*Status: DESIGN ONLY / UNTESTED. Offline XML schedule translation and schema parity are fully tested; live RF propagation tuning and packet-level slot enforcement have not been executed on a live Linux kernel testbed.*
+
 ---
 
 ## 7. Assumptions & Edge-Case Handling

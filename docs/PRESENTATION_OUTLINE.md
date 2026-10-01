@@ -101,7 +101,7 @@
 ### Slide 10: Conclusion & Future Roadmap
 - **Key Takeaways:**
   - Fully working Python TDMA planner with 5 heuristics and 2 exact solvers.
-  - 100% test coverage (42 pytest tests passing).
+  - 100% test coverage (47 pytest tests passing).
   - Full EMANE Docker container, XML configurations, and bridge scripts.
 - **Future Enhancements:**
   - Multi-frequency TDMA (2D time-frequency grid).
