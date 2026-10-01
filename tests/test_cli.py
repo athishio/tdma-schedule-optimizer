@@ -91,3 +91,60 @@ def test_cli_nonexistent_file_exits_nonzero(capsys):
     assert exit_code == 2
     captured = capsys.readouterr()
     assert "Coordinates file not found" in captured.err
+
+
+def test_matrix_header_unique_labels_for_shared_suffixes(capsys):
+    """Verify that matrix headers do not produce duplicate stripped column labels."""
+    from tdma.report import format_report, format_comparison_table
+
+    # Case 1: Shared numeric suffixes across different prefixes
+    sched_shared = {
+        "ClusterA_01": 0,
+        "ClusterA_02": 1,
+        "ClusterB_01": 0,
+        "ClusterB_02": 1,
+    }
+    coords_shared = {k: [0.0, 0.0] for k in sched_shared}
+    report_shared = format_report(coords_shared, sched_shared, 500.0, True)
+
+    # Extract header line
+    lines = report_shared.splitlines()
+    header_idx = [i for i, line in enumerate(lines) if "Slot \\ Node |" in line][0]
+    header_line = lines[header_idx]
+    col_labels = [c.strip() for c in header_line.split("|")[1:]]
+
+    # Must be 4 unique column headers, not ['01', '02', '01', '02']
+    assert len(col_labels) == 4
+    assert len(set(col_labels)) == 4
+    assert "ClusterA_01" in col_labels
+    assert "ClusterB_01" in col_labels
+
+    # Case 2: Node_XX keeps the compact 01 | 02 format
+    sched_nodes = {
+        "Node_01": 0,
+        "Node_02": 1,
+    }
+    coords_nodes = {k: [0.0, 0.0] for k in sched_nodes}
+    report_nodes = format_report(coords_nodes, sched_nodes, 500.0, True)
+    lines_nodes = report_nodes.splitlines()
+    h_idx_nodes = [i for i, line in enumerate(lines_nodes) if "Slot \\ Node |" in line][0]
+    col_labels_nodes = [c.strip() for c in lines_nodes[h_idx_nodes].split("|")[1:]]
+    assert col_labels_nodes == ["01", "02"]
+
+
+def test_fallback_solver_label_shortened_with_footnote():
+    """Verify fallback solver label is shortened to Exact (Python B&B) with footnote."""
+    from tdma.report import format_comparison_table
+
+    heuristic_results = {
+        "DSATUR": {"slots_used": 8, "runtime_ms": 0.12},
+    }
+    table = format_comparison_table(
+        heuristic_results,
+        optimum=8,
+        exact_solver_name="Pure-Python Branch-and-Bound (DSATUR)",
+        exact_runtime_ms=0.45,
+    )
+    assert "Exact (Python B&B)" in table
+    assert "* Exact (Python B&B): Pure-Python Branch-and-Bound (DSATUR)" in table
+

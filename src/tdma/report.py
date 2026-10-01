@@ -76,7 +76,14 @@ def format_report(
     lines.append("STRUCTURAL TDMA SCHEDULE MATRIX (Slot x Node Boolean Matrix):")
 
     # Matrix column header
-    col_labels = [short_node_label(node) for node in sorted_nodes]
+    stripped_labels = [short_node_label(node) for node in sorted_nodes]
+    if len(set(stripped_labels)) == len(sorted_nodes):
+        col_labels = stripped_labels
+    else:
+        # If stripped labels are not unique (e.g. ClusterA_01 and ClusterB_01 both strip to '01'),
+        # print full node names so every column header is unique.
+        col_labels = list(sorted_nodes)
+
     header = "Slot \\ Node | " + " | ".join(col_labels)
     lines.append(header)
     divider_len = max(len(header) + 4, 75)
@@ -86,7 +93,8 @@ def format_report(
     for slot_idx in range(k):
         row_bits = ["1" if schedule[node] == slot_idx else "0" for node in sorted_nodes]
         row_str = f"Slot {slot_idx:02d}    | " + " | ".join(
-            f"{bit:>{len(lbl)}}" for bit, lbl in zip(row_bits, col_labels)
+            f"{bit:^{len(lbl)}}" if len(lbl) > 2 else f"{bit:>{len(lbl)}}"
+            for bit, lbl in zip(row_bits, col_labels)
         )
         lines.append(row_str)
 
@@ -135,11 +143,20 @@ def format_comparison_table(
             gap = "N/A"
         lines.append(f"{name:<36} | {slots:<6} | {rt:<13.3f} | {opt_str:<8} | {gap:<5}")
 
+    footnote = None
     if optimum is not None and exact_solver_name:
         lines.append("-" * len(header))
-        exact_label = f"Exact ({exact_solver_name})"
+        # Shorten fallback solver label to "Exact (Python B&B)" to maintain column alignment
+        if "Branch-and-Bound" in exact_solver_name or "Python" in exact_solver_name:
+            exact_label = "Exact (Python B&B)"
+            footnote = f"* Exact (Python B&B): {exact_solver_name}"
+        else:
+            exact_label = f"Exact ({exact_solver_name})"
         rt_str = f"{exact_runtime_ms:.3f}" if exact_runtime_ms is not None else "N/A"
         lines.append(f"{exact_label:<36} | {optimum:<6} | {rt_str:<13} | {opt_str:<8} | 0 (Opt)")
+
+    if footnote:
+        lines.append(footnote)
 
     return "\n".join(lines)
 
