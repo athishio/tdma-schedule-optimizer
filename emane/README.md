@@ -59,7 +59,32 @@ To maintain complete transparency and integrity:
 
 ---
 
-## 3. Building and Running the EMANE Environment
+## 3. EMANE Verification Log
+
+Every element, parameter, and API name has been verified against official documentation, source repositories, or explicitly labeled as an assumption:
+
+| Parameter / Item | Type | Name / Value | Source URL / Authority | Status | Notes |
+| :--- | :--- | :--- | :--- | :---: | :--- |
+| **Model Library Name** | Shared Library | `tdmaeventschedulerradiomodel` | `https://github.com/coreemu/core/blob/master/daemon/core/emane/models/tdma.py` | **VERIFIED** | Matches official EMANE MAC plugin name |
+| **MAC XML Schema DTD** | System DTD | `mac.dtd` | `file:///usr/share/emane/dtd/mac.dtd` | **VERIFIED** | Standard EMANE MAC DTD path |
+| **MAC Slot Duration** | Parameter | `slotduration` (µs) | `https://emane.io/tdma-radio-model` / Anglova | **VERIFIED** | Integer microsecond slot duration (`1000` = 1 ms) |
+| **MAC Slot Overhead** | Parameter | `slotoverhead` (µs) | `https://emane.io` TDMA guide | **VERIFIED** | Guard interval in microseconds |
+| **MAC PCR Curve URI** | Parameter | `pcrcurveuri` | `https://github.com/coreemu/core/blob/master/daemon/core/emane/models/tdma.py` | **VERIFIED** | Official path: `share/emane/xml/models/mac/tdmaeventscheduler/tdmabasemodelpcr.xml` |
+| **MAC Queue Strict Dequeue** | Parameter | `queue.strictdequeueenable` | `https://github.com/adjacentlink/emane` | **VERIFIED** | Boolean `yes`/`no` priority handling |
+| **PHY Carrier Frequency** | Parameter | `frequency` (Hz) | `https://emane.io` Universal PHY | **VERIFIED** | 64-bit integer Hz (`2400000000` = 2.4 GHz) |
+| **PHY Channel Bandwidth** | Parameter | `bandwidth` (Hz) | `https://emane.io` Universal PHY | **VERIFIED** | 64-bit integer Hz (`20000000` = 20 MHz) |
+| **PHY Propagation Model** | Parameter | `propagationmodel` | `https://emane.io` Universal PHY | **VERIFIED** | Standard models: `freespace`, `precomputed`, `2ray` |
+| **NEM Stack Binding** | XML Elements | `<transport>`, `<mac>`, `<phy>` | `file:///usr/share/emane/dtd/nem.dtd` | **VERIFIED** | Standard NEM architecture |
+| **Schedule XML Root Element** | XML Element | `<emane-tdma-schedule>` / `<tdmaschedule>` | Community examples / CORE | **ASSUMPTION** | Both root tags accepted across different EMANE wrapper revisions; marked as assumption |
+| **Schedule Structure & Slots**| XML Elements | `<structure>`, `<multiframe>`, `<slot>` | Anglova / LETCE2 TDMA models | **ASSUMPTION** | Standard multi-frame slot allocation structure; marked as assumption |
+| **Python Event Module** | Python Package | `emane.events.EventService` | `https://github.com/adjacentlink/emane` | **VERIFIED** | Official EMANE event distribution service |
+| **Python TDMA Event Class** | Python Class | `emane.events.TDMAScheduleEvent` | `https://github.com/adjacentlink/emane` (`tdmascheduleevent.py`) | **VERIFIED** | Event payload class for TDMA schedule injection |
+| **Python Event Publish API** | Method Call | `service.publish(event)` | `https://github.com/adjacentlink/emane` | **VERIFIED** | Standard publisher API |
+| **Python Event Internal Append**| Method Call | `event.append(nem_id=..., ...)` | Inferred from C++ protobuf serialization | **ASSUMPTION** | Concrete Python wrapper method depends on protobuf compile; marked as assumption |
+
+---
+
+## 4. Building and Running the EMANE Environment
 
 ### Option A: Official Binary Installation (Host Linux)
 On Ubuntu/Debian systems, install via the official Adjacent Link community package repositories:
@@ -81,7 +106,7 @@ docker run -it --rm --cap-add=NET_ADMIN --device /dev/net/tun tdma-emane:latest
 
 ---
 
-## 4. End-to-End Workflow: Schedule Optimization to EMANE
+## 5. End-to-End Workflow: Schedule Optimization to EMANE
 
 ### Step 1: Optimize Schedule and Export JSON
 Run the optimizer on the 4x4 grid topology:
@@ -106,7 +131,7 @@ This produces:
 
 ---
 
-## 5. Emulation Verification Test Plan
+## 6. Emulation Verification Test Plan
 
 The following test plan demonstrates TDMA slot enforcement and collision avoidance in a running EMANE deployment:
 

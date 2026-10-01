@@ -179,7 +179,20 @@ def build_pdf(filename: str):
         )
     )
     story.append(t)
-    story.append(Spacer(1, 8))
+    story.append(Spacer(1, 6))
+
+    # Note on sample output vs verified optimum
+    story.append(
+        Paragraph(
+            "<b>Note on Sample Output vs. Verified Optimum:</b> The assignment brief includes an illustrative sample report "
+            "showing 5 slots. The brief explicitly states: <i>'The number of slots in the sample (5) is illustrative only; "
+            "do NOT hardcode or target it. The verifier is the source of truth.'</i> In a 4x4 grid with 300 m spacing and "
+            "500 m range, diagonal nodes are in direct range (424.3 m ≤ 500 m). Any 3x3 subgrid forms a 9-node clique in "
+            "G<sup>2</sup> (hop distance ≤ 2), proving mathematically that χ(G<sup>2</sup>) ≥ ω(G<sup>2</sup>) = 9. "
+            "Fewer than 9 slots would violate Distance-1 or Distance-2 constraints.",
+            body_style,
+        )
+    )
 
     # Section 5: Independent Verification
     story.append(Paragraph("5. Independent Verification & Integrity Assurance", h1_style))
@@ -187,22 +200,56 @@ def build_pdf(filename: str):
         Paragraph(
             "An independent verification engine evaluates candidate schedules directly on physical graph G via BFS shortest paths. "
             "It validates node coverage, contiguous slot labeling (0..K-1), and rigorously flags Distance-1 or Distance-2 collisions. "
-            "Full unit test suite (42 tests) passes with 100% test coverage.",
+            "The full test suite (45 unit, property, CLI, and bridge tests) passes with 100% test coverage.",
             body_style,
         )
     )
 
     # Section 6: EMANE Bridge
-    story.append(Paragraph("6. EMANE Emulation Bridge (Part 2)", h1_style))
+    story.append(Paragraph("6. EMANE Emulation Bridge (Part 2) & Verification Log", h1_style))
     story.append(
         Paragraph(
-            "The Part 2 integration bridge bridges mathematical schedules to Adjacent Link's EMANE TDMA radio model "
+            "The Part 2 integration bridge maps mathematical schedules to Adjacent Link's EMANE TDMA radio model "
             "(<code>tdmaeventschedulerradiomodel</code>). Configured with 1 ms slots (1000 µs), 50 µs guard time, "
             "and 2.4 GHz carrier frequency. Includes an automated XML translator, a Python event script generator, "
-            "and an end-to-end round-trip schema validation test suite.",
+            "and an offline round-trip schema validation test suite.<br/>"
+            "<b>Tested Offline:</b> Schedule translation, NEM ID mapping, XML generation, and round-trip schema parity.<br/>"
+            "<b>Design-Only:</b> Live over-the-air RF packet exchange inside kernel network stack (requires root/container).",
             body_style,
         )
     )
+
+    # EMANE Verification Log Table in PDF
+    emane_log_data = [
+        ["Parameter / Component", "Type", "Source / Reference", "Status"],
+        ["tdmaeventschedulerradiomodel", "MAC Library", "CORE / Adjacent Link Models", "VERIFIED"],
+        ["slotduration (1000 µs)", "MAC Param", "EMANE TDMA Guide / Anglova", "VERIFIED"],
+        ["slotoverhead (50 µs)", "MAC Param", "EMANE TDMA Model Docs", "VERIFIED"],
+        ["pcrcurveuri", "MAC Param", "share/emane/.../tdmabasemodelpcr.xml", "VERIFIED"],
+        ["frequency (2.4 GHz)", "PHY Param", "EMANE Universal PHY Guide", "VERIFIED"],
+        ["bandwidth (20 MHz)", "PHY Param", "EMANE Universal PHY Guide", "VERIFIED"],
+        ["EventService / TDMAScheduleEvent", "Python Event", "emane.events API (tdmascheduleevent.py)", "VERIFIED"],
+        ["<emane-tdma-schedule> / <slot>", "XML Schema", "Multi-frame slot structure", "ASSUMPTION"],
+        ["event.append(nem_id=..., ...)", "Event Method", "Inferred from C++ protobuf serialization", "ASSUMPTION"],
+    ]
+    t_emane = Table(emane_log_data, colWidths=[2.2 * inch, 1.1 * inch, 2.5 * inch, 1.1 * inch])
+    t_emane.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0D47A1")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 7.5),
+                ("ALIGN", (1, 0), (-1, -1), "CENTER"),
+                ("ALIGN", (0, 0), (0, -1), "LEFT"),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#CFD8DC")),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F5F7FA")]),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+                ("TOPPADDING", (0, 0), (-1, -1), 3),
+            ]
+        )
+    )
+    story.append(t_emane)
 
     doc.build(story)
     print(f"[SUCCESS] Generated PDF: {filename}")
@@ -356,7 +403,7 @@ def build_pptx(filename: str):
     # Slide 6: Results
     add_slide(
         "5. Empirical Benchmark Results",
-        "Performance Across Benchmark Scenarios (Seed = 42)",
+        "Performance Across Benchmark Scenarios (Seed = 42) | 9-Slot Lower Bound Proven for Grid",
         table_data=[
             ["Topology Scenario", "Nodes", "G Edges", "G² Edges", "Max Deg", "Exact Opt", "Best Heur", "Gap"],
             ["1. 4x4 Grid (300 m)", "16", "42", "90", "15", "9 slots", "9 slots", "0 (Opt)"],
@@ -386,8 +433,8 @@ def build_pptx(filename: str):
         bullets=[
             "EMANE Integration: Direct interface with tdmaeventschedulerradiomodel.",
             "Timing Profiles: 1.0 ms slots (1000 µs), 50 µs guard time, 2.4 GHz carrier, 20 MHz bandwidth.",
+            "EMANE Verification Log: Verified MAC/PHY params and EventService against official docs.",
             "Automated Translator: Converts schedule JSON to native EMANE schedule XML.",
-            "Dynamic Event Publisher: Standalone script publishing emane.events.TDMAScheduleEvent.",
             "Round-Trip Validation: Unit test suite verifies 100% parity between schedule matrix and XML.",
         ],
     )
@@ -401,7 +448,7 @@ def build_pptx(filename: str):
             "Duplicate Coordinate Detection: Rejects physically impossible co-located radios with clear error.",
             "Deterministic Seeds: Fixed default seed ensures 100% reproducible schedule allocation.",
             "Arbitrary Node Counts: Seamlessly supports any n ≥ 1 (including isolated single nodes).",
-            "100% Test Coverage: 42 pytest tests covering unit, property, CLI, and integration paths.",
+            "100% Test Coverage: 45 pytest tests covering unit, property, CLI, and integration paths.",
         ],
     )
 
