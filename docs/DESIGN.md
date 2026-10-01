@@ -267,27 +267,19 @@ The bridge module (`emane/bridge/schedule_to_emane.py`) implements a standalone 
 - **Tested Offline:** Automated schedule JSON transformation, NEM integer ID mapping, XML schedule generation, round-trip schema parsing, schedule-to-matrix parity assertion, and Python event script generation. Tested in pytest with 100% pass rate without requiring EMANE.
 - **Design-Only:** Real-time over-the-air RF packet exchange inside the Linux kernel network stack using running EMANE daemons (due to requirement of root/kernel privileges and containerized environment).
 
-### 6.4 EMANE Verification Log
-Every configuration parameter and schema name has been verified against official EMANE documentation, source repositories, or marked explicitly as an assumption:
-
-| Parameter / Item | Type | Name / Value | Source URL / Authority | Status | Notes |
-| :--- | :--- | :--- | :--- | :---: | :--- |
-| **Model Library Name** | Shared Library | `tdmaeventschedulerradiomodel` | `https://github.com/coreemu/core/blob/master/daemon/core/emane/models/tdma.py` | **VERIFIED** | Matches official EMANE MAC plugin name |
-| **MAC XML Schema DTD** | System DTD | `mac.dtd` | `file:///usr/share/emane/dtd/mac.dtd` | **VERIFIED** | Standard EMANE MAC DTD path |
-| **MAC Slot Duration** | Parameter | `slotduration` (µs) | `https://emane.io/tdma-radio-model` / Anglova | **VERIFIED** | Integer microsecond slot duration (`1000` = 1 ms) |
-| **MAC Slot Overhead** | Parameter | `slotoverhead` (µs) | `https://emane.io` TDMA guide | **VERIFIED** | Guard interval in microseconds |
-| **MAC PCR Curve URI** | Parameter | `pcrcurveuri` | `https://github.com/coreemu/core/blob/master/daemon/core/emane/models/tdma.py` | **VERIFIED** | Official path: `share/emane/xml/models/mac/tdmaeventscheduler/tdmabasemodelpcr.xml` |
-| **MAC Queue Strict Dequeue** | Parameter | `queue.strictdequeueenable` | `https://github.com/adjacentlink/emane` | **VERIFIED** | Boolean `yes`/`no` priority handling |
-| **PHY Carrier Frequency** | Parameter | `frequency` (Hz) | `https://emane.io` Universal PHY | **VERIFIED** | 64-bit integer Hz (`2400000000` = 2.4 GHz) |
-| **PHY Channel Bandwidth** | Parameter | `bandwidth` (Hz) | `https://emane.io` Universal PHY | **VERIFIED** | 64-bit integer Hz (`20000000` = 20 MHz) |
-| **PHY Propagation Model** | Parameter | `propagationmodel` | `https://emane.io` Universal PHY | **VERIFIED** | Standard models: `freespace`, `precomputed`, `2ray` |
-| **NEM Stack Binding** | XML Elements | `<transport>`, `<mac>`, `<phy>` | `file:///usr/share/emane/dtd/nem.dtd` | **VERIFIED** | Standard NEM architecture |
-| **Schedule XML Root Element** | XML Element | `<emane-tdma-schedule>` / `<tdmaschedule>` | Community examples / CORE | **ASSUMPTION** | Both root tags accepted across different EMANE wrapper revisions; marked as assumption |
-| **Schedule Structure & Slots**| XML Elements | `<structure>`, `<multiframe>`, `<slot>` | Anglova / LETCE2 TDMA models | **ASSUMPTION** | Standard multi-frame slot allocation structure; marked as assumption |
-| **Python Event Module** | Python Package | `emane.events.EventService` | `https://github.com/adjacentlink/emane` | **VERIFIED** | Official EMANE event distribution service |
-| **Python TDMA Event Class** | Python Class | `emane.events.TDMAScheduleEvent` | `https://github.com/adjacentlink/emane` (`tdmascheduleevent.py`) | **VERIFIED** | Event payload class for TDMA schedule injection |
-| **Python Event Publish API** | Method Call | `service.publish(event)` | `https://github.com/adjacentlink/emane` | **VERIFIED** | Standard publisher API |
-| **Python Event Internal Append**| Method Call | `event.append(nem_id=..., ...)` | Inferred from C++ protobuf serialization | **ASSUMPTION** | Concrete Python wrapper method depends on protobuf compile; marked as assumption |
+| Parameter / Component | Category | Verified Name / Value | Exact Official URL | Quoted Official Documentation | Status |
+| :--- | :--- | :--- | :--- | :--- | :---: |
+| **MAC Model Library** | MAC Plugin | `tdmaeventschedulerradiomodel` | [tdmaradiomodel.xml.in](https://github.com/adjacentlink/emane/blob/master/src/models/mac/tdma/eventscheduler/tdmaradiomodel.xml.in) | `<mac library='tdmaeventschedulerradiomodel'>` | **VERIFIED** |
+| **MAC Parameters vs Structure** | Architecture | Attributes of `<structure>`, not `<mac>` | [tdma-radio-model.txt](https://github.com/adjacentlink/emane-guide/blob/main/guide/tdma-radio-model.txt) | *"The TDMA structure defines: Slot size in microseconds, Slot overhead in microseconds, Number of slots per frame, Number of frames per multiframe, Transceiver bandwidth in Hz"* (lines 160-171) | **VERIFIED** |
+| **MAC PCR Curve URI** | MAC Parameter | `pcrcurveuri` | [tdmaradiomodel.xml.in](https://github.com/adjacentlink/emane/blob/master/src/models/mac/tdma/eventscheduler/tdmaradiomodel.xml.in) | `<param name="pcrcurveuri" value='file://@datadir@/xml/models/mac/tdmaeventscheduler/tdmabasemodelpcr.xml'/>` | **VERIFIED** |
+| **MAC Queue Controls** | MAC Parameters | `queue.depth`, `queue.aggregationenable`, etc. | [tdmaradiomodel.xml.in](https://github.com/adjacentlink/emane/blob/master/src/models/mac/tdma/eventscheduler/tdmaradiomodel.xml.in) | `<param name='queue.depth' value='255'/><param name='queue.aggregationenable' value='on'/><param name='queue.strictdequeueenable' value='off'/>` | **VERIFIED** |
+| **Schedule XML Root** | XML Schema | `<emane-tdma-schedule>` | [tdmaschedule.xsd](https://github.com/adjacentlink/emane/blob/master/src/python/emane/events/schema/tdmaschedule.xsd) | `<xs:element name='emane-tdma-schedule'>` (line 71) | **VERIFIED** |
+| **Schedule Structure** | XML Element | `<structure frames='..' slots='..' slotoverhead='..' slotduration='..' bandwidth='..'/>` | [tdmaschedule.xsd](https://github.com/adjacentlink/emane/blob/master/src/python/emane/events/schema/tdmaschedule.xsd) | `<xs:element name="structure" minOccurs='0'><xs:attribute name='slotduration' type='xs:unsignedLong' use='required'/><xs:attribute name='slotoverhead' type='xs:unsignedLong' use='required'/>...` | **VERIFIED** |
+| **Multiframe & Frames** | XML Elements | `<multiframe>` containing `<frame index='..'>` | [tdmaschedule.xsd](https://github.com/adjacentlink/emane/blob/master/src/python/emane/events/schema/tdmaschedule.xsd) | `<xs:element name="multiframe"><xs:complexType><xs:sequence><xs:element name="frame" maxOccurs="unbounded">` | **VERIFIED** |
+| **Slot Allocation & Types** | XML Elements | `<slot index='..' nodes='..'>` with `<tx>`, `<rx>`, `<idle>` | [tdmaschedule.xsd](https://github.com/adjacentlink/emane/blob/master/src/python/emane/events/schema/tdmaschedule.xsd) | `<xs:element name="slot" maxOccurs="unbounded"><xs:attribute name='index' use='required'/><xs:attribute name='nodes' use='required'/><xs:choice minOccurs='0'><xs:element name="tx">...` | **VERIFIED** |
+| **Schedule Injection Tool** | CLI Utility | `emaneevent-tdmaschedule` | [tdma-radio-model.txt](https://github.com/adjacentlink/emane-guide/blob/main/guide/tdma-radio-model.txt) | *"The emaneevent-tdmaschedule script can be used to process a TDMA Schedule XML file... $ emaneevent-tdmaschedule your-desired-schedule.xml -i lo"* (lines 370-377) | **VERIFIED** |
+| **Python Event Class** | Python Class | `emane.events.TDMAScheduleEvent` | [tdmascheduleevent.py](https://github.com/adjacentlink/emane/blob/master/src/python/emane/events/tdmascheduleevent.py) | `class TDMAScheduleEvent(Event): IDENTIFIER = 105; def structure(self,**kwargs): ... def append(self,frameIndex,slotIndex,**kwargs):` (lines 38, 86, 163) | **VERIFIED** |
+| **Python Event Publisher** | Python Class | `emane.events.EventService` | [eventservice.py](https://github.com/adjacentlink/emane/blob/master/src/python/emane/events/eventservice.py) | `class EventService: def __init__(self,eventchannel,otachannel = None): (self._multicastGroup,self._port,_) = eventchannel; def publish(self,nemId,event):` (lines 127, 345) | **VERIFIED** |
 
 ---
 

@@ -1,10 +1,15 @@
 """
 EMANE TDMA Schedule Generator and Validator.
 
-Reads schedule JSON produced by the TDMA Optimizer (Part 1) and generates:
-1. EMANE TDMA Event Schedule XML configuration for the tdmaeventschedulerradiomodel.
-2. Standalone Python EMANE Event publishing script using emane.events bindings.
-3. Round-trip validation to verify exact consistency without requiring EMANE.
+Converts schedule JSON produced by the TDMA Optimizer (Part 1) into:
+1. Official EMANE TDMA Schedule XML conforming to tdmaschedule.xsd for tdmaeventschedulerradiomodel.
+2. Standalone Python EMANE Event publishing script using official emane.events bindings.
+3. Round-trip validation to verify exact schedule parity without requiring EMANE installed.
+
+Official Documentation References:
+- TDMA Model Guide: https://github.com/adjacentlink/emane-guide/blob/main/guide/tdma-radio-model.txt
+- Schedule Schema: https://github.com/adjacentlink/emane/blob/master/src/python/emane/events/schema/tdmaschedule.xsd
+- Event Class: https://github.com/adjacentlink/emane/blob/master/src/python/emane/events/tdmascheduleevent.py
 """
 
 from __future__ import annotations
@@ -26,7 +31,6 @@ def node_name_to_nem_id(node_name: str) -> int:
     match = re.search(r"(\d+)$", node_name)
     if match:
         return int(match.group(1))
-    # Fallback: extract any digits
     digits = re.findall(r"\d+", node_name)
     if digits:
         return int(digits[0])
@@ -36,39 +40,33 @@ def node_name_to_nem_id(node_name: str) -> int:
 def generate_emane_tdma_xml(
     schedule_data: Dict[str, Any],
     slot_duration_us: int = 1000,
-    guard_interval_us: int = 50,
-    frequency_hz: int = 2400000000,
-    bandwidth_hz: int = 20000000,
+    slot_overhead_us: int = 50,
+    frequency_str: str = "2.4G",
+    bandwidth_str: str = "20M",
     power_dbm: float = 0.0,
-    datarate_bps: int = 10000000,
+    datarate_str: str = "10M",
 ) -> str:
     """
-    Generate the EMANE TDMA Schedule XML for tdmaeventschedulerradiomodel.
+    Generate official EMANE TDMA Schedule XML for tdmaeventschedulerradiomodel.
 
-    Mapping:
-    - Each frame contains K slots (where K is the optimized frame length).
-    - Slot duration is specified in microseconds (default 1000 us = 1 ms).
-    - In each slot, assigned nodes are configured as Transmitters (TX).
-    - All non-assigned nodes operate in Receive (RX) mode on the shared carrier frequency.
-
-    Args:
-        schedule_data: Dictionary loaded from Part 1 schedule JSON export.
-        slot_duration_us: Slot length in microseconds (default: 1000 us).
-        guard_interval_us: Slot guard interval in microseconds (default: 50 us).
-        frequency_hz: Radio frequency in Hz (default: 2.4 GHz).
-        bandwidth_hz: Channel bandwidth in Hz (default: 20 MHz).
-        power_dbm: Transmit power in dBm (default: 0 dBm).
-        datarate_bps: Over-the-air data rate in bps (default: 10 Mbps).
-
-    Returns:
-        str: Pretty-printed XML schedule string.
+    XML Structure (conforming to tdmaschedule.xsd):
+      <emane-tdma-schedule>
+        <structure frames="1" slots="K" slotoverhead="50" slotduration="1000" bandwidth="20M"/>
+        <multiframe frequency="2.4G" power="0.0" class="0" datarate="10M">
+          <frame index="0">
+            <slot index="0" nodes="6">
+              <tx/>
+            </slot>
+            ...
+          </frame>
+        </multiframe>
+      </emane-tdma-schedule>
     """
     schedule: Dict[str, int] = schedule_data.get("schedule", {})
     if not schedule:
         raise ValueError("Schedule data is empty or missing 'schedule' key.")
 
     k = max(schedule.values()) + 1
-    total_nodes = len(schedule)
 
     # Group nodes by slot
     slot_to_nodes: Dict[int, List[str]] = {slot_idx: [] for slot_idx in range(k)}
@@ -77,49 +75,50 @@ def generate_emane_tdma_xml(
 
     root = ET.Element("emane-tdma-schedule")
 
-    # 1. Structure definition
-    structure = ET.SubElement(
+    # 1. Structure definition (timing & bandwidth are defined here, NOT in MAC config)
+    ET.SubElement(
         root,
         "structure",
         {
             "frames": "1",
             "slots": str(k),
+            "slotoverhead": str(slot_overhead_us),
             "slotduration": str(slot_duration_us),
-            "guardtime": str(guard_interval_us),
+            "bandwidth": bandwidth_str,
         },
     )
 
-    # 2. Multiframe definition
-    multiframe = ET.SubElement(root, "multiframe")
+    # 2. Multiframe definition with frame defaults
+    multiframe = ET.SubElement(
+        root,
+        "multiframe",
+        {
+            "frequency": frequency_str,
+            "power": f"{power_dbm:.1f}",
+            "class": "0",
+            "datarate": datarate_str,
+        },
+    )
     frame = ET.SubElement(multiframe, "frame", {"index": "0"})
-
-    all_nems: Set[int] = {node_name_to_nem_id(n) for n in schedule.keys()}
 
     for slot_idx in range(k):
         assigned_nodes = slot_to_nodes[slot_idx]
         tx_nems = sorted([node_name_to_nem_id(n) for n in assigned_nodes])
-        tx_str = ",".join(str(nem) for nem in tx_nems) if tx_nems else "none"
-
-        # RX NEMs are all nodes not transmitting in this slot
-        rx_nems = sorted(list(all_nems - set(tx_nems)))
-        rx_str = ",".join(str(nem) for nem in rx_nems) if rx_nems else "*"
+        if not tx_nems:
+            continue
+        nodes_str = ",".join(str(nem) for nem in tx_nems)
 
         slot_elem = ET.SubElement(
             frame,
             "slot",
             {
                 "index": str(slot_idx),
-                "nodes": tx_str,
-                "tx": tx_str,
-                "rx": rx_str,
-                "frequency": str(frequency_hz),
-                "bandwidth": str(bandwidth_hz),
-                "power": f"{power_dbm:.1f}",
-                "datarate": str(datarate_bps),
+                "nodes": nodes_str,
             },
         )
+        ET.SubElement(slot_elem, "tx")
 
-    # Format with indentation
+    # Format with clean indentation
     ET.indent(root, space="  ")
     xml_header = '<?xml version="1.0" encoding="UTF-8"?>\n'
     return xml_header + ET.tostring(root, encoding="unicode") + "\n"
@@ -138,6 +137,7 @@ def parse_emane_tdma_xml(xml_content: str) -> Dict[str, Any]:
 
     slots_count = int(structure.attrib["slots"])
     slot_duration = int(structure.attrib["slotduration"])
+    slot_overhead = int(structure.attrib.get("slotoverhead", structure.attrib.get("guardtime", 0)))
 
     frame = root.find(".//frame")
     if frame is None:
@@ -156,6 +156,7 @@ def parse_emane_tdma_xml(xml_content: str) -> Dict[str, Any]:
     return {
         "slots_count": slots_count,
         "slot_duration_us": slot_duration,
+        "slot_overhead_us": slot_overhead,
         "slot_assignments": slot_assignments,
     }
 
@@ -166,9 +167,6 @@ def validate_round_trip(
     """
     Validate that the generated EMANE XML schedule exactly matches
     the original optimization schedule matrix.
-
-    Returns:
-        Tuple[bool, List[str]]: (is_consistent, error_messages)
     """
     errors: List[str] = []
     parsed = parse_emane_tdma_xml(xml_content)
@@ -208,46 +206,63 @@ def generate_emane_python_event_script(
     schedule = schedule_data.get("schedule", {})
     k = max(schedule.values()) + 1 if schedule else 0
 
+    # Parse multicast group and port
+    if ":" in group:
+        mcast_addr, mcast_port = group.split(":")
+    else:
+        mcast_addr, mcast_port = group, "45703"
+
     script_content = f'''#!/usr/bin/env python3
 """
 EMANE TDMA Dynamic Schedule Event Publisher.
 Generated automatically by TDMA Schedule Optimizer Bridge.
 
-Injects the optimized TDMA schedule into a live EMANE emulation instance
-via the EMANE Event Service multicast channel.
+Official API References:
+- EventService: https://github.com/adjacentlink/emane/blob/master/src/python/emane/events/eventservice.py
+- TDMAScheduleEvent: https://github.com/adjacentlink/emane/blob/master/src/python/emane/events/tdmascheduleevent.py
 """
 
 import sys
-import time
 
 try:
-    from emane.events import EventService
-    from emane.events import TDMAScheduleEvent
+    from emane.events import EventService, TDMAScheduleEvent
 except ImportError:
     print("[ERROR] EMANE Python event libraries (emane.events) are not installed.")
     print("Please run this script inside an environment with EMANE installed.")
     sys.exit(1)
 
 
-def publish_schedule(event_channel="{group}", device="{device}"):
-    """Publish TDMA Schedule Event to active EMANE NEMs."""
-    print(f"[INFO] Initializing EMANE EventService on {{device}} ({{event_channel}})...")
-    service = EventService(device=device, group=event_channel)
+def publish_schedule(group="{mcast_addr}", port={mcast_port}, device="{device}"):
+    """Publish TDMA Schedule Event to active EMANE NEMs using official EventService."""
+    print(f"[INFO] Initializing EMANE EventService on {{device}} ({{group}}:{{port}})...")
+    service = EventService(eventchannel=(group, int(port), device))
 
-    # Frame structure: 1 frame, {k} slots, 1000 us (1 ms) per slot
-    event = TDMAScheduleEvent()
-    
-    # Slot allocations based on optimized spatial reuse:
+    # Construct full schedule definition
+    event = TDMAScheduleEvent(frequency=2400000000, datarate=10000000, service=0, power=0.0)
+    event.structure(
+        slots={k},
+        frames=1,
+        slotduration=1000,
+        slotoverhead=50,
+        bandwidth=20000000
+    )
+
+    # Per-NEM schedule allocations:
 '''
-    for node, slot in sorted(schedule.items(), key=lambda kv: kv[1]):
-        nem_id = node_name_to_nem_id(node)
-        script_content += f'    # {node} -> Slot {slot}\n'
-        script_content += f'    event.append(nem_id={nem_id}, slot_index={slot}, tx=True)\n'
+    # Group by NEM
+    nem_to_slots: Dict[int, List[int]] = {}
+    for node, slot in sorted(schedule.items()):
+        nem = node_name_to_nem_id(node)
+        nem_to_slots.setdefault(nem, []).append(slot)
+
+    for nem_id in sorted(nem_to_slots.keys()):
+        slots_list = nem_to_slots[nem_id]
+        for s in slots_list:
+            script_content += f'    event.append(0, {s}, type="tx")  # NEM {nem_id} transmits in Frame 0, Slot {s}\n'
+        script_content += f'    service.publish({nem_id}, event)\n'
 
     script_content += f'''
-    print("[INFO] Publishing TDMAScheduleEvent ({k} slots) to all NEMs...")
-    service.publish(event)
-    print("[SUCCESS] TDMA schedule successfully applied to emulation.")
+    print("[SUCCESS] TDMA schedule ({k} slots) successfully published to all NEMs.")
 
 
 if __name__ == "__main__":
@@ -284,6 +299,12 @@ def main(argv: Optional[List[str]] = None) -> int:
         default=1000,
         help="Slot duration in microseconds (default: 1000 us = 1 ms).",
     )
+    parser.add_argument(
+        "--slot-overhead-us",
+        type=int,
+        default=50,
+        help="Slot overhead / guard interval in microseconds (default: 50 us).",
+    )
 
     args = parser.parse_args(argv)
 
@@ -296,7 +317,9 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     # Generate XML
     xml_output = generate_emane_tdma_xml(
-        schedule_data, slot_duration_us=args.slot_duration_us
+        schedule_data,
+        slot_duration_us=args.slot_duration_us,
+        slot_overhead_us=args.slot_overhead_us,
     )
 
     # Perform round-trip validation

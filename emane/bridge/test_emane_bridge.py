@@ -37,7 +37,9 @@ def test_round_trip_grid_schedule():
         }
     }
     xml_str = generate_emane_tdma_xml(sample_data, slot_duration_us=1000)
-    assert "<structure frames=\"1\" slots=\"3\" slotduration=\"1000\"" in xml_str
+    assert 'frames="1"' in xml_str
+    assert 'slots="3"' in xml_str
+    assert 'slotduration="1000"' in xml_str
     assert 'nodes="1,4"' in xml_str
 
     parsed = parse_emane_tdma_xml(xml_str)

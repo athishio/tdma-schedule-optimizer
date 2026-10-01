@@ -3,56 +3,27 @@
 <!--
   EMANE TDMA Event Scheduler MAC Model Configuration Profile
   =============================================================
-  Implements slot-synchronized TDMA medium access control.
-  Each parameter is configured for a 1 ms (1000 microsecond) slot duration.
+  Official Plugin: tdmaeventschedulerradiomodel
+  Source: https://github.com/adjacentlink/emane/blob/master/src/models/mac/tdma/eventscheduler/tdmaradiomodel.xml.in
+
+  NOTE: Timing parameters (slotduration, slotoverhead, slots, frames, bandwidth)
+  are dynamically configured via the schedule XML <structure> element and
+  TDMAScheduleEvent, rather than static MAC configuration parameters.
 -->
 <mac library="tdmaeventschedulerradiomodel">
-  <!--
-    enablepromiscuousmode:
-    Controls whether the MAC delivers frames destined for other nodes to the upper layer.
-    Set to 'no' to simulate normal unicast filtering while allowing broadcast traffic.
-  -->
-  <param name="enablepromiscuousmode" value="no"/>
+  <!-- PCR curve definition URI for packet reception probability -->
+  <param name="pcrcurveuri" value="file:///usr/share/emane/xml/models/mac/tdmaeventscheduler/tdmabasemodelpcr.xml"/>
 
-  <!--
-    flowcontrolenable:
-    Enables flow control feedback between the MAC queue and the upstream transport layer.
-    Disabled ('no') to avoid synthetic backpressure artifacts in benchmark throughput tests.
-  -->
-  <param name="flowcontrolenable" value="no"/>
+  <!-- MAC queue management and threshold configurations -->
+  <param name="queue.depth" value="255"/>
+  <param name="queue.aggregationenable" value="on"/>
+  <param name="queue.aggregationslotthreshold" value="90.0"/>
+  <param name="queue.fragmentationenable" value="on"/>
+  <param name="queue.strictdequeueenable" value="off"/>
 
-  <!--
-    slotduration:
-    Length of an individual TDMA slot in microseconds (usec).
-    Value '1000' defines a 1.0 ms slot duration as specified by protocol requirements.
-  -->
-  <param name="slotduration" value="1000"/>
-
-  <!--
-    slotoverhead:
-    Guard interval and transceiver synchronization overhead in microseconds within each slot.
-    Set to '50' usec (5% of slot time) to accommodate propagation delay and RF ramp-up.
-  -->
-  <param name="slotoverhead" value="50"/>
-
-  <!--
-    pcrcurveuri:
-    URI pointing to the Packet Clear Rate (PCR) vs SINR curve file used by the model
-    to evaluate packet reception probability. Defaults to standard EMANE internal table.
-  -->
-  <param name="pcrcurveuri" value="file:///usr/share/emane/models/mac/tdmaeventscheduler/tdmabasemodelpcr.xml"/>
-
-  <!--
-    queue.strictdequeueenable:
-    Whether strict priority queueing is enforced when multiple traffic classes exist.
-    Set to 'no' for uniform round-robin transmission across standard traffic queues.
-  -->
-  <param name="queue.strictdequeueenable" value="no"/>
-
-  <!--
-    queue.depth:
-    Maximum number of packets retained in the MAC transmission queue before dropping.
-    Set to '256' packets to absorb traffic bursts without excessive bufferbloat latency.
-  -->
-  <param name="queue.depth" value="256"/>
+  <!-- Fragment reassembly timeouts and neighbor metric updates -->
+  <param name="fragmentcheckthreshold" value="2"/>
+  <param name="fragmenttimeoutthreshold" value="5"/>
+  <param name="neighbormetricdeletetime" value="60.0"/>
+  <param name="neighbormetricupdateinterval" value="1.0"/>
 </mac>
