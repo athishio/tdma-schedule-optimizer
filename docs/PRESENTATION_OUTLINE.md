@@ -47,7 +47,7 @@
   - *Fallback Solver:* Pure-Python DSATUR Branch-and-Bound Backtracking.
 - **Symmetry Breaking:** Maximum clique $\omega(G^2)$ is pre-assigned fixed colors $0 \dots \omega-1$.
 - **Lower Bound Pruning:** Search halts immediately once upper bound matches clique lower bound.
-- **Performance:** Solves 16-node topologies in $< 0.5\text{ ms}$.
+- **Performance:** Solves 16-node topologies in about 1 ms or less.
 
 ---
 
@@ -80,6 +80,7 @@
 - **Profiles Created:**
   - 1 ms slot duration (`1000` $\mu\text{s}$), 50 $\mu\text{s}$ guard time.
   - 2.4 GHz carrier, 20 MHz bandwidth, 0 dBm transmit power.
+- **Parameter Verification:** Parameter names checked against official EMANE sources; live run not performed.
 - **Automated Translator (`schedule_to_emane.py`):**
   - Converts JSON schedule to native EMANE schedule XML.
   - Generates Python `emane.events.TDMAScheduleEvent` publisher script.
@@ -88,9 +89,10 @@
 ---
 
 ### Slide 9: Emulation Test Plan & Engineering Decisions
-- **Emulation Verification Test Plan:**
-  - *Valid Schedule:* Ping/iperf packets transmit strictly inside scheduled 1 ms slots at 9 ms intervals.
-  - *Corrupted Schedule:* Overlapping transmissions in Slot 0 drop SINR below PCR threshold, triggering packet discards.
+- **PLANNED TEST PLAN (not yet run):**
+  - Valid schedule: expect delivery only in scheduled slots (planned)
+  - Deliberately conflicting schedule: expect collision/loss (planned)
+  - Range calibration: pathloss tuned to ~500 m (planned)
 - **Key Engineering Decisions:**
   - Float epsilon ($10^{-9}$) ensures exact 500.0 m points are included.
   - Duplicate coordinate validation detects impossible physical co-locations.
@@ -100,9 +102,9 @@
 
 ### Slide 10: Conclusion & Future Roadmap
 - **Key Takeaways:**
-  - Fully working Python TDMA planner with 5 heuristics and 2 exact solvers.
+  - Part 1 complete and verified; Part 2 designed and tested offline.
   - 100% test coverage (47 pytest tests passing).
-  - Full EMANE Docker container, XML configurations, and bridge scripts.
+  - EMANE bridge: offline round-trip tested; live run pending.
 - **Future Enhancements:**
   - Multi-frequency TDMA (2D time-frequency grid).
   - Mobile ad-hoc networks with distributed scheduling (DRAND).

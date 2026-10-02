@@ -6,6 +6,7 @@ and docs/presentation.pptx (10-slide visual deck matching PRESENTATION_OUTLINE.m
 from __future__ import annotations
 
 import io
+import json
 import os
 import sys
 import tempfile
@@ -37,6 +38,9 @@ from pptx.util import Inches, Pt, Emu
 from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
 from pptx.enum.shapes import MSO_SHAPE
+
+from tdma.graph import parse_coordinates, build_connectivity_graph
+from tdma.verify import verify_schedule
 
 # ---------------------------------------------------------------------------
 # Colors
@@ -109,7 +113,7 @@ def build_pdf(filename: str):
     )
     styles = getSampleStyleSheet()
 
-    # Typography styles — 10-11pt body for readability over 5-7 pages
+    # Typography styles — 10 pt body for clean readability over 5 pages
     title_style = ParagraphStyle(
         "DocTitle",
         parent=styles["Title"],
@@ -133,46 +137,46 @@ def build_pdf(filename: str):
         "H1_Custom",
         parent=styles["Heading1"],
         fontName="Helvetica-Bold",
-        fontSize=14,
-        leading=17,
+        fontSize=13,
+        leading=16,
         textColor=colors.HexColor(NAVY),
-        spaceBefore=14,
-        spaceAfter=6,
+        spaceBefore=12,
+        spaceAfter=5,
         keepWithNext=True,
     )
     h2_style = ParagraphStyle(
         "H2_Custom",
         parent=styles["Heading2"],
         fontName="Helvetica-Bold",
-        fontSize=11,
-        leading=14,
+        fontSize=10.5,
+        leading=13.5,
         textColor=colors.HexColor(LIGHT_NAVY),
-        spaceBefore=10,
-        spaceAfter=4,
+        spaceBefore=8,
+        spaceAfter=3,
         keepWithNext=True,
     )
     body_style = ParagraphStyle(
         "Body_Custom",
         parent=styles["BodyText"],
         fontName="Helvetica",
-        fontSize=10,
-        leading=13.5,
+        fontSize=9.5,
+        leading=13,
         textColor=colors.HexColor(BODY_COLOR),
-        spaceAfter=6,
+        spaceAfter=5,
     )
     bullet_style = ParagraphStyle(
         "Bullet_Custom",
         parent=body_style,
-        leftIndent=18,
-        firstLineIndent=-12,
-        spaceAfter=4,
+        leftIndent=16,
+        firstLineIndent=-10,
+        spaceAfter=3,
     )
     table_cell = ParagraphStyle(
         "TableCell",
         parent=styles["Normal"],
         fontName="Helvetica",
-        fontSize=8,
-        leading=10,
+        fontSize=7.8,
+        leading=9.8,
         textColor=colors.HexColor(BODY_COLOR),
     )
     table_cell_bold = ParagraphStyle(
@@ -281,7 +285,7 @@ def build_pdf(filename: str):
         body_style
     ))
 
-    # SECTION 3.3 — Design Process & Decisions (NEW)
+    # SECTION 3.3 — Considered but Not Implemented
     story.append(Paragraph("3.3 Design Process &amp; Decisions", h2_style))
     story.append(Paragraph(
         "<b>Why graph squaring?</b> The TDMA conflict constraints require that no two nodes within 2 hops share a slot. "
@@ -298,10 +302,12 @@ def build_pdf(filename: str):
         body_style
     ))
     story.append(Paragraph(
-        "<b>What was tried and rejected?</b> Pure Genetic Algorithms were prototyped but rejected due to excessive "
-        "runtime (&gt; 5 seconds), high stochastic variance, and poor constraint satisfaction. Simulated Annealing "
-        "on unconstrained encodings frequently converged with 1-2 lingering conflicts. Naive ILP without symmetry "
-        "breaking was orders of magnitude slower; adding maximum clique fixation resolved this.",
+        "<b>Considered but not implemented:</b> Pure Genetic Algorithms were considered for global search, but stochastic "
+        "evaluation offers no optimality guarantee or proof, requires complex encodings, and cannot strictly enforce hard "
+        "distance-2 constraints without auxiliary repair heuristics. Simulated Annealing on soft energy formulations "
+        "requires fragile penalty schedule tuning and frequently converges to states with lingering conflicts. Plain ILP "
+        "without symmetry breaking suffers from exponential search tree explosion over equivalent color permutations; "
+        "anchoring maximum-clique colors upfront breaks this symmetry.",
         body_style
     ))
     story.append(Paragraph(
@@ -447,7 +453,7 @@ def build_pdf(filename: str):
     ))
 
     story.append(Paragraph("6.3 Official EMANE Verification Log", h2_style))
-    # Full official verification log table
+    # Full official verification log table with wider Status column (0.85 in) so VERIFIED does not wrap
     emane_rows = [
         [
             Paragraph("Parameter / Component", table_cell_header),
@@ -488,7 +494,7 @@ def build_pdf(filename: str):
             Paragraph("Schedule Root Element", table_cell_bold),
             Paragraph("XML Schema", table_cell),
             Paragraph("&lt;emane-tdma-schedule&gt;", table_cell),
-            Paragraph("<b>tdmaschedule.xsd</b> (line 71): <i>&lt;xs:element name='emane-tdma-schedule'&gt;</i>", table_cell),
+            Paragraph("<b>tdmaschedule.xsd</b>: <i>&lt;xs:element name='emane-tdma-schedule'&gt;</i>", table_cell),
             Paragraph("<b>VERIFIED</b>", table_cell_bold),
         ],
         [
@@ -516,7 +522,7 @@ def build_pdf(filename: str):
             Paragraph("CLI Injection Tool", table_cell_bold),
             Paragraph("CLI Script", table_cell),
             Paragraph("emaneevent-tdmaschedule", table_cell),
-            Paragraph("<b>tdma-radio-model.txt</b> (line 376): <i>$ emaneevent-tdmaschedule schedule.xml -i lo</i>", table_cell),
+            Paragraph("<b>tdma-radio-model.txt</b>: <i>$ emaneevent-tdmaschedule schedule.xml -i lo</i>", table_cell),
             Paragraph("<b>VERIFIED</b>", table_cell_bold),
         ],
         [
@@ -534,7 +540,7 @@ def build_pdf(filename: str):
             Paragraph("<b>VERIFIED</b>", table_cell_bold),
         ],
     ]
-    t_log = Table(emane_rows, colWidths=[1.4 * inch, 0.8 * inch, 1.4 * inch, 2.85 * inch, 0.65 * inch])
+    t_log = Table(emane_rows, colWidths=[1.35 * inch, 0.75 * inch, 1.35 * inch, 2.95 * inch, 0.85 * inch])
     t_log.setStyle(
         TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(NAVY)),
@@ -561,6 +567,22 @@ def build_pdf(filename: str):
         "virtual radios must be placed at the exact coordinates of the input topology and pathloss calibrated so the effective range is ~500 m; "
         "otherwise all nodes hear each other globally and concurrent transmissions (e.g. Node_01 and Node_04 sharing Slot 8) would collide. "
         "<i>Status: DESIGN ONLY / UNTESTED. Schedule XML generation and schema parity are fully tested offline; live RF propagation tuning and packet-level slot enforcement have not been executed on a live Linux kernel testbed.</i>",
+        body_style
+    ))
+
+    # SECTION 6.5 — Bridge Design & Planned Test Plan
+    story.append(Paragraph("6.5 Bridge Design &amp; Planned Test Plan (Not Yet Run)", h2_style))
+    story.append(Paragraph(
+        "<b>XML Schedule Translation:</b> Each node's timeslot assignment from the optimizer is mapped into an EMANE "
+        "<code>&lt;slot&gt;</code> entry. Transmitting nodes are tagged with <code>&lt;tx&gt;</code> containing their 1-based NEM identifier "
+        "(e.g., <code>nodes='1,4,13,16'</code> for Slot 8), while non-transmitting nodes default to receive mode (<code>&lt;rx&gt;</code>).<br/>"
+        "<b>Schedule Injection:</b> The schedule is loaded at startup via <code>&lt;param name='schedule' value='schedule.xml'/&gt;</code> "
+        "or published dynamically onto the EMANE event channel (<code>224.1.2.8:45703</code>) using <code>emaneevent-tdmaschedule</code> "
+        "or Python <code>emane.events.EventService.publish()</code>.<br/>"
+        "<b>Planned Observations:</b> In a live testbed run: (1) Valid schedule: ping/iperf traffic should emit strictly inside "
+        "scheduled 1.0 ms slots at 9 ms frame intervals with 0% loss; (2) Deliberately conflicting schedule: forced 2-hop co-allocations "
+        "should collide at the shared receiver, causing low SINR and PCR packet discards; (3) Range calibration: pathloss tuned to ~500 m "
+        "to demonstrate spatial reuse without false collisions.",
         body_style
     ))
 
@@ -592,62 +614,78 @@ def build_pdf(filename: str):
 # ---------------------------------------------------------------------------
 
 def _generate_grid_graph_image(path: str):
-    """Draw a 4x4 grid colored by 9 slots."""
-    fig, ax = plt.subplots(1, 1, figsize=(6, 6))
+    """Draw 4x4 grid colored by the verified 9-slot schedule from examples/grid_schedule.json."""
+    schedule_file = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "examples", "grid_schedule.json")
+    with open(schedule_file, "r", encoding="utf-8") as f:
+        data = json.load(f)
 
-    # 4x4 grid node positions
-    positions = {}
-    for r in range(4):
-        for c in range(4):
-            idx = r * 4 + c + 1
-            positions[idx] = (c * 300, (3 - r) * 300)
+    raw_coords = data["coordinates"]
+    schedule = data["schedule"]
 
-    # Optimal 9-slot coloring (verified by our solver)
-    slot_assignment = {
-        1: 0, 2: 1, 3: 2, 4: 3,
-        5: 4, 6: 5, 7: 6, 8: 0,
-        9: 7, 10: 8, 11: 0, 12: 1,
-        13: 3, 14: 2, 15: 3, 16: 0,
-    }
+    coords = parse_coordinates(raw_coords)
+    G = build_connectivity_graph(coords, 500.0)
 
-    cmap = plt.cm.Set1
-    slot_colors = {s: cmap(s / 9.0) for s in range(9)}
+    # Abort if independent verification fails
+    is_valid, violations = verify_schedule(G, schedule)
+    if not is_valid:
+        raise RuntimeError(f"Cannot generate diagram: schedule is invalid! Violations: {violations}")
 
-    # Draw edges (within 500m)
-    for i in positions:
-        for j in positions:
-            if j > i:
-                dx = positions[i][0] - positions[j][0]
-                dy = positions[i][1] - positions[j][1]
-                if (dx**2 + dy**2) ** 0.5 <= 500.0 + 1e-9:
-                    ax.plot(
-                        [positions[i][0], positions[j][0]],
-                        [positions[i][1], positions[j][1]],
-                        color="#BDBDBD", linewidth=0.8, zorder=1,
-                    )
+    fig, ax = plt.subplots(1, 1, figsize=(7.2, 5.5))
 
-    # Draw nodes
-    for node_id, (x, y) in positions.items():
-        slot = slot_assignment[node_id]
-        c = slot_colors[slot]
-        circle = plt.Circle((x, y), 38, color=c, ec="black", linewidth=1.5, zorder=3)
+    slot_colors = [
+        "#E41A1C", "#377EB8", "#4DAF4A", "#984EA3", "#FF7F00",
+        "#FFFF33", "#A65628", "#F781BF", "#00C853",
+    ]
+
+    # Draw connectivity edges
+    for u, v in G.edges():
+        xu, yu = coords[u]
+        xv, yv = coords[v]
+        ax.plot([xu, xv], [yu, yv], color="#CFD8DC", linewidth=1.2, zorder=1)
+
+    corner_nodes = {"Node_01", "Node_04", "Node_13", "Node_16"}
+
+    for node_name, (x, y) in coords.items():
+        slot = schedule[node_name]
+        color = slot_colors[slot]
+
+        # Highlight corners (Slot 8)
+        if node_name in corner_nodes:
+            halo = plt.Circle((x, y), 54, color="#00C853", fill=False, linewidth=3.0, linestyle="--", zorder=3)
+            ax.add_patch(halo)
+            circle = plt.Circle((x, y), 38, facecolor=color, edgecolor="#1B5E20", linewidth=2.5, zorder=4)
+        else:
+            circle = plt.Circle((x, y), 38, facecolor=color, edgecolor="#37474F", linewidth=1.5, zorder=4)
+
         ax.add_patch(circle)
-        ax.text(x, y, str(node_id), ha="center", va="center", fontsize=10,
-                fontweight="bold", color="black", zorder=4)
 
-    # Legend
-    handles = [mpatches.Patch(color=slot_colors[s], label=f"Slot {s}") for s in range(9)]
-    ax.legend(handles=handles, loc="upper right", fontsize=7, ncol=3,
-              framealpha=0.9, title="9-Slot Assignment", title_fontsize=8)
+        label_num = str(int(node_name.split("_")[-1]))
+        ax.text(x, y, label_num, ha="center", va="center", fontsize=9.5, fontweight="bold",
+                color="black" if slot == 5 else "white", zorder=5)
 
-    ax.set_xlim(-80, 980)
-    ax.set_ylim(-80, 980)
+    # Caption highlighting the corners
+    ax.text(450, -110, "Highlighted corners (1, 4, 13, 16): Slot 8\n3+ hops apart: same slot (spatial reuse)",
+            ha="center", va="top", fontsize=8.5, fontweight="bold", color="#1B5E20",
+            bbox=dict(boxstyle="round,pad=0.3", facecolor="#E8F5E9", edgecolor="#81C784", alpha=0.9))
+
+    # Legend outside plot
+    legend_handles = [
+        mpatches.Patch(facecolor=slot_colors[s], edgecolor="#37474F", label=f"Slot {s}")
+        for s in range(9)
+    ]
+    ax.legend(handles=legend_handles, title="Slots (9 total)", loc="upper left",
+              bbox_to_anchor=(1.02, 1.0), frameon=True, fontsize=8, title_fontsize=9)
+
+    ax.set_xlim(-100, 1000)
+    ax.set_ylim(-180, 1020)
     ax.set_aspect("equal")
-    ax.set_title("4×4 Grid Topology — 9-Slot Optimal Coloring", fontsize=13, fontweight="bold")
-    ax.set_xlabel("X (meters)", fontsize=10)
-    ax.set_ylabel("Y (meters)", fontsize=10)
+    ax.set_title("4×4 Grid (300 m) — Optimal 9-Slot Assignment", fontsize=11, fontweight="bold", pad=8)
+    ax.set_xlabel("X (meters)", fontsize=8)
+    ax.set_ylabel("Y (meters)", fontsize=8)
+    ax.tick_params(labelsize=7)
+
     fig.tight_layout()
-    fig.savefig(path, dpi=180, bbox_inches="tight")
+    fig.savefig(path, dpi=200, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -691,7 +729,7 @@ def _generate_hidden_terminal_image(path: str):
 
     ax.set_title("Hidden Terminal Problem: A → B ← C", fontsize=14, fontweight="bold", pad=10)
     fig.tight_layout()
-    fig.savefig(path, dpi=180, bbox_inches="tight")
+    fig.savefig(path, dpi=200, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -727,13 +765,13 @@ def _generate_benchmark_bar_chart(path: str):
                 ha="center", va="bottom", fontsize=10, color="#42A5F5")
 
     fig.tight_layout()
-    fig.savefig(path, dpi=180, bbox_inches="tight")
+    fig.savefig(path, dpi=200, bbox_inches="tight")
     plt.close(fig)
 
 
 def _generate_architecture_diagram(path: str):
     """Part 2 architecture: Python brain -> JSON -> bridge -> XML -> EMANE."""
-    fig, ax = plt.subplots(1, 1, figsize=(9, 3.5))
+    fig, ax = plt.subplots(1, 1, figsize=(9, 3.2))
     ax.set_xlim(-0.5, 10.5)
     ax.set_ylim(-1, 3)
     ax.axis("off")
@@ -771,7 +809,7 @@ def _generate_architecture_diagram(path: str):
 
     ax.set_title("Part 2: EMANE Integration Architecture", fontsize=14, fontweight="bold", pad=15)
     fig.tight_layout()
-    fig.savefig(path, dpi=180, bbox_inches="tight")
+    fig.savefig(path, dpi=200, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -786,7 +824,6 @@ def build_pptx(filename: str):
 
     blank_layout = prs.slide_layouts[6]
 
-    # Color constants
     NAVY_RGB = RGBColor(13, 71, 161)
     WHITE_RGB = RGBColor(255, 255, 255)
     DARK_TEXT = RGBColor(33, 33, 33)
@@ -795,7 +832,6 @@ def build_pptx(filename: str):
     def add_title_slide(title_text, subtitle_text, notes_text=""):
         """Dark navy full-background title/section slide."""
         slide = prs.slides.add_slide(blank_layout)
-        # Full navy background
         bg = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, 0, 0, Inches(13.333), Inches(7.5))
         bg.fill.solid()
         bg.fill.fore_color.rgb = NAVY_RGB
@@ -819,13 +855,13 @@ def build_pptx(filename: str):
         sp = stf.paragraphs[0]
         sp.text = subtitle_text
         sp.font.size = Pt(22)
-        sp.font.color.rgb = RGBColor(187, 222, 251)  # light blue
+        sp.font.color.rgb = RGBColor(187, 222, 251)
         sp.alignment = PP_ALIGN.LEFT
 
         # Accent line
         line = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(1.2), Inches(3.4), Inches(4), Inches(0.04))
         line.fill.solid()
-        line.fill.fore_color.rgb = RGBColor(66, 165, 245)  # accent blue
+        line.fill.fore_color.rgb = RGBColor(66, 165, 245)
         line.line.fill.background()
 
         if notes_text:
@@ -836,7 +872,7 @@ def build_pptx(filename: str):
                           image_left=None, image_top=None, image_width=None, image_height=None,
                           notes_text="", big_number=None, big_number_sub=None,
                           table_data=None, two_column_bullets=None):
-        """White content slide with navy top banner."""
+        """White content slide with navy top banner and aspect-ratio-preserved images."""
         slide = prs.slides.add_slide(blank_layout)
 
         # Top banner
@@ -912,23 +948,33 @@ def build_pptx(filename: str):
                     p.space_after = Pt(10)
                     p.font.color.rgb = DARK_TEXT
 
+        # Add image preserving natural aspect ratio
         if image_path and os.path.exists(image_path):
             il = image_left or Inches(6.8)
             it = image_top or current_top
             iw = image_width or Inches(5.8)
-            ih = image_height or Inches(5.0)
-            slide.shapes.add_picture(image_path, il, it, iw, ih)
+            if image_height:
+                slide.shapes.add_picture(image_path, il, it, width=iw, height=image_height)
+            else:
+                slide.shapes.add_picture(image_path, il, it, width=iw)
 
         if table_data:
             rows = len(table_data)
             cols = len(table_data[0])
             left = Inches(0.8)
             top = current_top + Inches(0.1)
-            width = Inches(5.4) if image_path else Inches(11.7)
+            total_width = Inches(5.6) if image_path else Inches(11.7)
             height = Inches(0.45 * rows)
 
-            table_shape = slide.shapes.add_table(rows, cols, left, top, width, height)
+            table_shape = slide.shapes.add_table(rows, cols, left, top, total_width, height)
             t = table_shape.table
+
+            # Widen scenario column on Slide 6 so "Disconnected" does not wrap
+            if cols == 5 and image_path:
+                col_widths = [Inches(2.1), Inches(0.7), Inches(0.95), Inches(0.95), Inches(0.6)]
+                for c_idx, w in enumerate(col_widths):
+                    t.columns[c_idx].width = w
+
             for r_idx, row in enumerate(table_data):
                 for c_idx, val in enumerate(row):
                     cell = t.cell(r_idx, c_idx)
@@ -959,7 +1005,7 @@ def build_pptx(filename: str):
         return slide
 
     # ------------------------------------------------------------------
-    # Generate matplotlib images
+    # Generate matplotlib images inside temporary directory
     # ------------------------------------------------------------------
     with tempfile.TemporaryDirectory(prefix="pptx_img_") as img_dir:
         grid_img = os.path.join(img_dir, "grid_graph.png")
@@ -993,8 +1039,8 @@ def build_pptx(filename: str):
         add_content_slide(
             "The Physical & Protocol Challenge",
             image_path=hidden_img,
-            image_left=Inches(6.5), image_top=Inches(1.5),
-            image_width=Inches(6.2), image_height=Inches(5.0),
+            image_left=Inches(6.5), image_top=Inches(1.8),
+            image_width=Inches(6.0),
             bullets=[
                 "• Distance-1: Adjacent nodes (d ≤ 500 m)\n  collide if transmitting concurrently",
                 "• Distance-2: Hidden terminal — shared\n  neighbor receives corrupted packets",
@@ -1047,7 +1093,7 @@ def build_pptx(filename: str):
                     "B. Pure-Python Branch & Bound (fallback)",
                     "",
                     "✓ Symmetry breaking via max-clique",
-                    "✓ < 0.5 ms on 16-node topologies",
+                    "✓ about 1 ms or less on 16-node topologies",
                 ],
             ),
             notes_text=(
@@ -1059,7 +1105,8 @@ def build_pptx(filename: str):
                 "5. Local Search: Kempe-chain 2-color swaps and min-conflicts Tabu search to eliminate highest color classes.\n\n"
                 "Two exact solvers:\n"
                 "A. Google OR-Tools CP-SAT: 0-1 ILP constraint optimization with symmetry-breaking inequalities.\n"
-                "B. Pure-Python Branch-and-Bound: Zero-dependency fallback with DSATUR branching and clique pre-coloring."
+                "B. Pure-Python Branch-and-Bound: Zero-dependency fallback with DSATUR branching and clique pre-coloring.\n"
+                "Performance: about 1 ms or less on 16-node benchmark topologies."
             )
         )
 
@@ -1078,7 +1125,7 @@ def build_pptx(filename: str):
                 "Fallback Solver: Pure-Python Branch-and-Bound Backtracking with DSATUR variable branching and clique pre-coloring.\n"
                 "Maximum Clique Pre-coloring: Nodes in the maximum clique ω(G²) are pinned to fixed colors 0..ω-1, eliminating color permutation explosion.\n"
                 "Lower-Bound Pruning: Search halts immediately once best-known upper bound matches clique lower bound.\n"
-                "Sub-Millisecond Speed: Both exact solvers compute the true global optimum for 16-node topologies in < 0.5 ms.\n"
+                "Performance: about 1 ms or less on 16-node topologies.\n"
                 "The --force-pure-python-exact flag runs the Branch-and-Bound solver even when OR-Tools is available, for comparison."
             )
         )
@@ -1087,8 +1134,8 @@ def build_pptx(filename: str):
         add_content_slide(
             "Empirical Results & Benchmark Suite",
             image_path=bar_img,
-            image_left=Inches(6.5), image_top=Inches(1.5),
-            image_width=Inches(6.2), image_height=Inches(5.0),
+            image_left=Inches(6.6), image_top=Inches(1.8),
+            image_width=Inches(5.9),
             table_data=[
                 ["Scenario", "Nodes", "Exact Opt", "Best Heur", "Gap"],
                 ["4×4 Grid (300 m)", "16", "9 slots", "9 slots", "0"],
@@ -1116,7 +1163,7 @@ def build_pptx(filename: str):
             ],
             image_path=grid_img,
             image_left=Inches(6.5), image_top=Inches(1.5),
-            image_width=Inches(6.0), image_height=Inches(5.5),
+            image_width=Inches(6.2),
             notes_text=(
                 "Design Principle: Absolute separation of concerns — zero shared code with coloring or G² construction.\n"
                 "BFS Shortest-Path Checks: Evaluates hop distances directly on physical graph G.\n"
@@ -1124,8 +1171,13 @@ def build_pptx(filename: str):
                 "  - Every node has exactly one slot (Coverage check).\n"
                 "  - Slots are contiguous 0..K-1 (Contiguity check).\n"
                 "  - No pairs within 1 or 2 hops share slots (Conflict freedom).\n"
-                "Outcome: Catches deliberate collisions, missing nodes, and gaps; exits non-zero on failure.\n"
-                "The grid diagram shows the verified 9-slot assignment for the 4x4 topology."
+                "Outcome: Catches deliberate collisions, missing nodes, and gaps; exits non-zero on failure.\n\n"
+                "Verified 4x4 Grid node-to-slot list (matches CLI output):\n"
+                "Node_01: Slot 8, Node_02: Slot 4, Node_03: Slot 5, Node_04: Slot 8, "
+                "Node_05: Slot 6, Node_06: Slot 0, Node_07: Slot 1, Node_08: Slot 6, "
+                "Node_09: Slot 7, Node_10: Slot 2, Node_11: Slot 3, Node_12: Slot 7, "
+                "Node_13: Slot 8, Node_14: Slot 4, Node_15: Slot 5, Node_16: Slot 8.\n"
+                "The four corners (Nodes 1, 4, 13, 16) are 3+ hops apart and safely reuse Slot 8."
             )
         )
 
@@ -1133,16 +1185,16 @@ def build_pptx(filename: str):
         add_content_slide(
             "EMANE Emulation Bridge (Part 2)",
             image_path=arch_img,
-            image_left=Inches(0.5), image_top=Inches(3.5),
-            image_width=Inches(12.3), image_height=Inches(3.5),
+            image_left=Inches(1.5), image_top=Inches(3.5),
+            image_width=Inches(10.3),
             bullets=[
                 "• Integrates with tdmaeventschedulerradiomodel",
                 "• 1 ms slots, 50 µs guard, 2.4 GHz, 20 MHz BW",
-                "• 11/11 parameters verified against official docs",
+                "• Parameter names checked against official EMANE sources; live run not performed",
             ],
             notes_text=(
                 "High-Fidelity Radio Emulation: Integrates with EMANE tdmaeventschedulerradiomodel (1 ms slots, 50 µs guard time).\n"
-                "Official Verification Log: 100% verified against Adjacent Link official documentation, XML schemas, and Python bindings.\n"
+                "Parameter names checked against official EMANE sources; live run not performed.\n"
                 "Timing Architecture: Slot duration (1000 µs), overhead (50 µs), and bandwidth (20 MHz) defined in <structure> XML.\n"
                 "Range Modeling (Design Only): EMANE uses LocationEvent (ID 100) / PathlossEvent (ID 101) & PCR curves to calibrate ~500 m range.\n"
                 "Tested vs Design-Only Boundary: Offline schema parsing and round-trip parity tested; live kernel RF execution documented.\n"
@@ -1155,10 +1207,10 @@ def build_pptx(filename: str):
             "Test Plan & Engineering Decisions",
             two_column_bullets=(
                 [
-                    "EMULATION TEST PLAN:",
-                    "• Valid schedule: 0% loss at 9 ms\n  frame intervals",
-                    "• Conflicting schedule: deliberate\n  collision → > 80% discards",
-                    "• Range calibration: freespace model\n  tuned for ~500 m cutoff",
+                    "PLANNED TEST PLAN (not yet run):",
+                    "• Valid schedule: expect delivery only\n  in scheduled slots (planned)",
+                    "• Deliberately conflicting schedule:\n  expect collision/loss (planned)",
+                    "• Range calibration: pathloss tuned\n  to ~500 m (planned)",
                 ],
                 [
                     "ENGINEERING DECISIONS:",
@@ -1168,8 +1220,11 @@ def build_pptx(filename: str):
                 ],
             ),
             notes_text=(
-                "Test Case 1 (Valid Schedule): Ping and iperf traffic pass with 0% loss; packets emit strictly at 9 ms frame intervals.\n"
-                "Test Case 2 (Conflicting Schedule): Deliberate collision forces SINR below PCR curve; triggers > 80% packet discards.\n"
+                "Planned Test Plan (Not Yet Run):\n"
+                "1. Valid Schedule: expect delivery strictly inside scheduled slots (planned).\n"
+                "2. Deliberately Conflicting Schedule: expect collisions and packet drops at shared receivers (planned).\n"
+                "3. Range Calibration: pathloss tuned to ~500 m so that radios beyond 500 m do not collide (planned).\n\n"
+                "Engineering Safeguards:\n"
                 "Exact 500.0 m Boundary: Applied 10⁻⁹ m epsilon tolerance to guarantee exact 500.0 m coordinates are in direct range.\n"
                 "Duplicate Coordinate Rejection: Detects physically impossible co-locations and terminates with explicit diagnostic errors.\n"
                 "Deterministic Reproducibility: Seeded random generators guarantee reproducible schedules across runs."
@@ -1181,13 +1236,13 @@ def build_pptx(filename: str):
             "Conclusion & Future Roadmap",
             bullets=[
                 "• 5 heuristics + 2 exact solvers + independent verifier",
-                "• Full EMANE bridge with Docker, configs, and publisher",
+                "• EMANE bridge: offline round-trip tested; live run pending",
                 "• Future: multi-channel TDMA, mobile MANET, STDMA",
             ],
             big_number="47 tests — 100% pass",
-            big_number_sub="Production-grade TDMA optimizer with proven correctness",
+            big_number_sub="Part 1 complete and verified; Part 2 designed and tested offline",
             notes_text=(
-                "Summary: Complete, hardened TDMA schedule planner with 5 heuristics, 2 exact solvers, and independent BFS verifier.\n"
+                "Summary: Part 1 complete and verified; Part 2 designed and tested offline.\n"
                 "Test Suite: 47 automated unit, property, CLI, and bridge tests passing with 100% pass rate.\n"
                 "Multi-Channel TDMA (2D Grid): Joint time-frequency scheduling (t, f) across orthogonal RF channels.\n"
                 "Distributed MANET Scheduling: Implement decentralized slot negotiation (DRAND / C-TDMA) for mobile ad-hoc nodes.\n"

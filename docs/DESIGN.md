@@ -154,10 +154,10 @@ The optimizer implements five diverse heuristics complemented by two exact solve
      - Immediate termination when upper bound equals clique lower bound $\omega(G^2)$.
      - DSATUR variable branching order.
 
-### 3.7 What Was Tried and Rejected
-- **Pure Genetic Algorithms (GA):** Prototyped with chromosome string representations. Rejected due to excessive runtime ($> 5\text{ seconds}$), high stochastic variance, and poor constraint satisfaction without heavy repair heuristics.
-- **Simulated Annealing on Unconstrained Encodings:** Tested with temperature cooling schedules. Frequently converged to near-valid states with 1–2 lingering conflicts, requiring additional post-processing repairs.
-- **Naive ILP without Symmetry Breaking:** Slower by orders of magnitude due to branching over equivalent color permutations. Adding maximum clique fixation resolved this bottleneck.
+### 3.7 Considered but Not Implemented
+- **Genetic Algorithms (GA):** Considered for global search, but stochastic evaluation offers no guarantee or proof of optimality, requires complex chromosome encodings for graph coloring, and cannot strictly enforce hard distance-2 constraints without auxiliary repair heuristics.
+- **Simulated Annealing (SA):** Unconstrained energy formulations with conflict penalties require fragile temperature schedule tuning and frequently terminate with lingering violations, requiring secondary deterministic repair passes.
+- **Plain ILP without Symmetry Breaking:** Standard 0-1 ILP formulations suffer from massive search tree expansion due to symmetric color permutations (any permutation of color indices represents an identical physical schedule). Adding maximum-clique pre-coloring breaks this symmetry by anchoring $\omega(G^2)$ colors upfront.
 
 ---
 
@@ -269,16 +269,16 @@ The bridge module (`emane/bridge/schedule_to_emane.py`) implements a standalone 
 | Parameter / Component | Category | Verified Name / Value | Exact Official URL | Quoted Official Documentation | Status |
 | :--- | :--- | :--- | :--- | :--- | :---: |
 | **MAC Model Library** | MAC Plugin | `tdmaeventschedulerradiomodel` | [tdmaradiomodel.xml.in](https://github.com/adjacentlink/emane/blob/master/src/models/mac/tdma/eventscheduler/tdmaradiomodel.xml.in) | `<mac library='tdmaeventschedulerradiomodel'>` | **VERIFIED** |
-| **MAC Parameters vs Structure** | Architecture | Attributes of `<structure>`, not `<mac>` | [tdma-radio-model.txt](https://github.com/adjacentlink/emane-guide/blob/main/guide/tdma-radio-model.txt) | *"The TDMA structure defines: Slot size in microseconds, Slot overhead in microseconds, Number of slots per frame, Number of frames per multiframe, Transceiver bandwidth in Hz"* (lines 160-171) | **VERIFIED** |
+| **MAC Parameters vs Structure** | Architecture | Attributes of `<structure>`, not `<mac>` | [tdma-radio-model.txt](https://github.com/adjacentlink/emane-guide/blob/main/guide/tdma-radio-model.txt) | *"The TDMA structure defines: Slot size in microseconds, Slot overhead in microseconds, Number of slots per frame, Number of frames per multiframe, Transceiver bandwidth in Hz"* | **VERIFIED** |
 | **MAC PCR Curve URI** | MAC Parameter | `pcrcurveuri` | [tdmaradiomodel.xml.in](https://github.com/adjacentlink/emane/blob/master/src/models/mac/tdma/eventscheduler/tdmaradiomodel.xml.in) | `<param name="pcrcurveuri" value='file://@datadir@/xml/models/mac/tdmaeventscheduler/tdmabasemodelpcr.xml'/>` | **VERIFIED** |
 | **MAC Queue Controls** | MAC Parameters | `queue.depth`, `queue.aggregationenable`, etc. | [tdmaradiomodel.xml.in](https://github.com/adjacentlink/emane/blob/master/src/models/mac/tdma/eventscheduler/tdmaradiomodel.xml.in) | `<param name='queue.depth' value='255'/><param name='queue.aggregationenable' value='on'/><param name='queue.strictdequeueenable' value='off'/>` | **VERIFIED** |
-| **Schedule XML Root** | XML Schema | `<emane-tdma-schedule>` | [tdmaschedule.xsd](https://github.com/adjacentlink/emane/blob/master/src/python/emane/events/schema/tdmaschedule.xsd) | `<xs:element name='emane-tdma-schedule'>` (line 71) | **VERIFIED** |
+| **Schedule XML Root** | XML Schema | `<emane-tdma-schedule>` | [tdmaschedule.xsd](https://github.com/adjacentlink/emane/blob/master/src/python/emane/events/schema/tdmaschedule.xsd) | `<xs:element name='emane-tdma-schedule'>` | **VERIFIED** |
 | **Schedule Structure** | XML Element | `<structure frames='..' slots='..' slotoverhead='..' slotduration='..' bandwidth='..'/>` | [tdmaschedule.xsd](https://github.com/adjacentlink/emane/blob/master/src/python/emane/events/schema/tdmaschedule.xsd) | `<xs:element name="structure" minOccurs='0'><xs:attribute name='slotduration' type='xs:unsignedLong' use='required'/><xs:attribute name='slotoverhead' type='xs:unsignedLong' use='required'/>...` | **VERIFIED** |
 | **Multiframe & Frames** | XML Elements | `<multiframe>` containing `<frame index='..'>` | [tdmaschedule.xsd](https://github.com/adjacentlink/emane/blob/master/src/python/emane/events/schema/tdmaschedule.xsd) | `<xs:element name="multiframe"><xs:complexType><xs:sequence><xs:element name="frame" maxOccurs="unbounded">` | **VERIFIED** |
 | **Slot Allocation & Types** | XML Elements | `<slot index='..' nodes='..'>` with `<tx>`, `<rx>`, `<idle>` | [tdmaschedule.xsd](https://github.com/adjacentlink/emane/blob/master/src/python/emane/events/schema/tdmaschedule.xsd) | `<xs:element name="slot" maxOccurs="unbounded"><xs:attribute name='index' use='required'/><xs:attribute name='nodes' use='required'/><xs:choice minOccurs='0'><xs:element name="tx">...` | **VERIFIED** |
-| **Schedule Injection Tool** | CLI Utility | `emaneevent-tdmaschedule` | [tdma-radio-model.txt](https://github.com/adjacentlink/emane-guide/blob/main/guide/tdma-radio-model.txt) | *"The emaneevent-tdmaschedule script can be used to process a TDMA Schedule XML file... $ emaneevent-tdmaschedule your-desired-schedule.xml -i lo"* (lines 370-377) | **VERIFIED** |
-| **Python Event Class** | Python Class | `emane.events.TDMAScheduleEvent` | [tdmascheduleevent.py](https://github.com/adjacentlink/emane/blob/master/src/python/emane/events/tdmascheduleevent.py) | `class TDMAScheduleEvent(Event): IDENTIFIER = 105; def structure(self,**kwargs): ... def append(self,frameIndex,slotIndex,**kwargs):` (lines 38, 86, 163) | **VERIFIED** |
-| **Python Event Publisher** | Python Class | `emane.events.EventService` | [eventservice.py](https://github.com/adjacentlink/emane/blob/master/src/python/emane/events/eventservice.py) | `class EventService: def __init__(self,eventchannel,otachannel = None): (self._multicastGroup,self._port,_) = eventchannel; def publish(self,nemId,event):` (lines 127, 345) | **VERIFIED** |
+| **Schedule Injection Tool** | CLI Utility | `emaneevent-tdmaschedule` | [tdma-radio-model.txt](https://github.com/adjacentlink/emane-guide/blob/main/guide/tdma-radio-model.txt) | *"The emaneevent-tdmaschedule script can be used to process a TDMA Schedule XML file... $ emaneevent-tdmaschedule your-desired-schedule.xml -i lo"* | **VERIFIED** |
+| **Python Event Class** | Python Class | `emane.events.TDMAScheduleEvent` | [tdmascheduleevent.py](https://github.com/adjacentlink/emane/blob/master/src/python/emane/events/tdmascheduleevent.py) | `class TDMAScheduleEvent(Event): IDENTIFIER = 105; def structure(self,**kwargs): ... def append(self,frameIndex,slotIndex,**kwargs):` | **VERIFIED** |
+| **Python Event Publisher** | Python Class | `emane.events.EventService` | [eventservice.py](https://github.com/adjacentlink/emane/blob/master/src/python/emane/events/eventservice.py) | `class EventService: def __init__(self,eventchannel,otachannel = None): (self._multicastGroup,self._port,_) = eventchannel; def publish(self,nemId,event):` | **VERIFIED** |
 
 ### 6.4 Radio Propagation & Range Modeling (Design Only / Untested)
 EMANE's TDMA scheduler radio model has no intrinsic knowledge of the discrete 500.0 m communication range constraint. In EMANE, which virtual radios hear each other is determined strictly by node locations and RF pathloss (location/pathloss events) combined with receiver sensitivity and antenna configuration.
@@ -289,6 +289,16 @@ To demonstrate spatial reuse in an emulation:
 3. **Collision Risk Under Global Visibility:** If the emulation were executed without location/pathloss events or with an uncalibrated propagation model, all 16 virtual radios would hear one another globally across the multicast OTA channel (`224.1.2.8:45703`). Under global visibility, concurrent transmissions scheduled for nodes separated by $\ge 3$ hops (e.g., Node_01 and Node_04 sharing Slot 8 in the 4x4 grid) would collide at the PHY layer, causing packet drops that the graph model proves should not occur.
 
 *Status: DESIGN ONLY / UNTESTED. Offline XML schedule translation and schema parity are fully tested; live RF propagation tuning and packet-level slot enforcement have not been executed on a live Linux kernel testbed.*
+
+### 6.5 Bridge Design and Planned Test Plan (Not Yet Run)
+1. **XML Schedule Translation:**
+   Each node's timeslot assignment from the optimizer is mapped into an EMANE `<slot>` entry. Transmitting nodes are tagged with `<tx>` containing their 1-based NEM identifier (`nodes="1,4,13,16"`), while non-transmitting nodes default to receive mode (`<rx>`).
+2. **Schedule Injection:**
+   The schedule is either loaded at initialization via `<param name='schedule' value='schedule.xml'/>` or published dynamically onto the EMANE event channel (`224.1.2.8:45703`) using `emaneevent-tdmaschedule` or Python `emane.events.EventService.publish()`.
+3. **Planned Verification Observations:**
+   - *Valid Schedule:* In a planned emulation run, ping and iperf streams between nodes should observe packet transmissions occurring strictly inside allocated 1.0 ms slots at repeating frame intervals, with zero packet loss between collision-free transmitters.
+   - *Deliberately Conflicting Schedule:* Forcing two nodes within 2 hops to share a slot should produce simultaneous transmissions that overlap at the shared receiver, resulting in low SINR, PCR curve packet discards, and measurable loss.
+   - *Range Calibration:* Pathloss and antenna parameters should be calibrated so received power beyond ~500 m drops below the receiver sensitivity threshold, demonstrating physical spatial reuse without false collisions.
 
 ---
 
