@@ -294,9 +294,9 @@ To demonstrate spatial reuse in an emulation:
 1. **XML Schedule Translation:**
    Each node's timeslot assignment from the optimizer is mapped into an EMANE `<slot>` entry. Transmitting nodes are tagged with `<tx>` containing their 1-based NEM identifier (`nodes="1,4,13,16"`), while non-transmitting nodes default to receive mode (`<rx>`).
 2. **Schedule Injection:**
-   The schedule is either loaded at initialization via `<param name='schedule' value='schedule.xml'/>` or published dynamically onto the EMANE event channel (`224.1.2.8:45703`) using `emaneevent-tdmaschedule` or Python `emane.events.EventService.publish()`.
+   Schedules are delivered to the radio model as `TDMAScheduleEvent` events via `emaneevent-tdmaschedule` or Python `emane.events.EventService.publish()`. Loading from a MAC `<param>` is an ASSUMPTION, not verified.
 3. **Planned Verification Observations:**
-   - *Valid Schedule:* In a planned emulation run, ping and iperf streams between nodes should observe packet transmissions occurring strictly inside allocated 1.0 ms slots at repeating frame intervals, with zero packet loss between collision-free transmitters.
+   - *Valid Schedule:* In a planned emulation run, ping and iperf streams between nodes should observe packet transmissions occurring strictly inside allocated 1.0 ms slots at repeating frame intervals, with expected delivery only in scheduled slots.
    - *Deliberately Conflicting Schedule:* Forcing two nodes within 2 hops to share a slot should produce simultaneous transmissions that overlap at the shared receiver, resulting in low SINR, PCR curve packet discards, and measurable loss.
    - *Range Calibration:* Pathloss and antenna parameters should be calibrated so received power beyond ~500 m drops below the receiver sensitivity threshold, demonstrating physical spatial reuse without false collisions.
 

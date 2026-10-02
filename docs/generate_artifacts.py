@@ -453,13 +453,20 @@ def build_pdf(filename: str):
     ))
 
     story.append(Paragraph("6.3 Official EMANE Verification Log", h2_style))
+    story.append(Paragraph(
+        "Reference repositories: "
+        "<link href='https://github.com/adjacentlink/emane'>https://github.com/adjacentlink/emane</link>"
+        " &nbsp;&nbsp; "
+        "<link href='https://github.com/adjacentlink/emane-guide'>https://github.com/adjacentlink/emane-guide</link>",
+        body_style
+    ))
     # Full official verification log table with wider Status column (0.85 in) so VERIFIED does not wrap
     emane_rows = [
         [
             Paragraph("Parameter / Component", table_cell_header),
             Paragraph("Category", table_cell_header),
             Paragraph("Verified Name / Setting", table_cell_header),
-            Paragraph("Official URL &amp; Quoted Line", table_cell_header),
+            Paragraph("Source file &amp; quoted line", table_cell_header),
             Paragraph("Status", table_cell_header),
         ],
         [
@@ -576,11 +583,12 @@ def build_pdf(filename: str):
         "<b>XML Schedule Translation:</b> Each node's timeslot assignment from the optimizer is mapped into an EMANE "
         "<code>&lt;slot&gt;</code> entry. Transmitting nodes are tagged with <code>&lt;tx&gt;</code> containing their 1-based NEM identifier "
         "(e.g., <code>nodes='1,4,13,16'</code> for Slot 8), while non-transmitting nodes default to receive mode (<code>&lt;rx&gt;</code>).<br/>"
-        "<b>Schedule Injection:</b> The schedule is loaded at startup via <code>&lt;param name='schedule' value='schedule.xml'/&gt;</code> "
-        "or published dynamically onto the EMANE event channel (<code>224.1.2.8:45703</code>) using <code>emaneevent-tdmaschedule</code> "
-        "or Python <code>emane.events.EventService.publish()</code>.<br/>"
+        "<b>Schedule Injection:</b> Schedules are delivered to the radio model as "
+        "<code>TDMAScheduleEvent</code> events via <code>emaneevent-tdmaschedule</code> "
+        "or Python <code>emane.events.EventService.publish()</code>. "
+        "Loading from a MAC <code>&lt;param&gt;</code> is an ASSUMPTION, not verified.<br/>"
         "<b>Planned Observations:</b> In a live testbed run: (1) Valid schedule: ping/iperf traffic should emit strictly inside "
-        "scheduled 1.0 ms slots at 9 ms frame intervals with 0% loss; (2) Deliberately conflicting schedule: forced 2-hop co-allocations "
+        "scheduled 1.0 ms slots at 9 ms frame intervals with expected delivery only in scheduled slots; (2) Deliberately conflicting schedule: forced 2-hop co-allocations "
         "should collide at the shared receiver, causing low SINR and PCR packet discards; (3) Range calibration: pathloss tuned to ~500 m "
         "to demonstrate spatial reuse without false collisions.",
         body_style
@@ -971,7 +979,7 @@ def build_pptx(filename: str):
 
             # Widen scenario column on Slide 6 so "Disconnected" does not wrap
             if cols == 5 and image_path:
-                col_widths = [Inches(2.1), Inches(0.7), Inches(0.95), Inches(0.95), Inches(0.6)]
+                col_widths = [Inches(2.1), Inches(0.85), Inches(0.95), Inches(0.95), Inches(0.6)]
                 for c_idx, w in enumerate(col_widths):
                     t.columns[c_idx].width = w
 
@@ -1039,8 +1047,8 @@ def build_pptx(filename: str):
         add_content_slide(
             "The Physical & Protocol Challenge",
             image_path=hidden_img,
-            image_left=Inches(6.5), image_top=Inches(1.8),
-            image_width=Inches(6.0),
+            image_left=Inches(6.5), image_top=Inches(1.5),
+            image_width=Inches(6.5),
             bullets=[
                 "• Distance-1: Adjacent nodes (d ≤ 500 m)\n  collide if transmitting concurrently",
                 "• Distance-2: Hidden terminal — shared\n  neighbor receives corrupted packets",
@@ -1134,8 +1142,8 @@ def build_pptx(filename: str):
         add_content_slide(
             "Empirical Results & Benchmark Suite",
             image_path=bar_img,
-            image_left=Inches(6.6), image_top=Inches(1.8),
-            image_width=Inches(5.9),
+            image_left=Inches(6.6), image_top=Inches(1.5),
+            image_width=Inches(6.3),
             table_data=[
                 ["Scenario", "Nodes", "Exact Opt", "Best Heur", "Gap"],
                 ["4×4 Grid (300 m)", "16", "9 slots", "9 slots", "0"],
