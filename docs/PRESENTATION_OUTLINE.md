@@ -2,110 +2,125 @@
 
 **Target Audience:** Wireless Protocol Development Internship Interviewers & Systems Engineers  
 **Duration:** 15–20 minutes  
-**Format:** 10 Slides  
+**Format:** 8 Slides (16:9 Widescreen, 13.333 × 7.5 in)  
+**Presenter:** Athish M (athishm2007@gmail.com)  
 
 ---
 
-### Slide 1: Title & Overview
-- **Title:** TDMA Schedule Planner & Spatial Reuse Optimizer
-- **Subtitle:** Conflict-Free Frame Optimization in Multi-Hop Wireless Networks with EMANE Emulation Bridge
-- **Presenter:** Protocol Development Engineering Candidate
-- **Core Objective:** Minimize TDMA frame length under strict Distance-1 and Distance-2 (hidden terminal) constraints while exploiting spatial reuse.
+### Slide 1: Title
+- **Kicker:** WIRELESS PROTOCOL DEVELOPMENT | TAKE-HOME TASK
+- **Title:** Packing a radio network into the fewest time slots
+- **Subtitle:** distance-2 graph coloring, spatial reuse, exact-optimum benchmark, EMANE bridge
+- **Key Metrics / Stats:**
+  - `16` radios, 500 m range
+  - `9` slots on the 4x4 grid, proven optimal
+  - `47` automated tests passing
+- **Presenter:** Athish M
 
 ---
 
-### Slide 2: The Physical & Protocol Challenge
-- **Shared Wireless Medium:** Single frequency channel, half-duplex omnidirectional transceivers.
-- **Interference Modalities:**
-  - *Distance-1 Collision:* Adjacent nodes within radio range ($d \le 500\text{ m}$) collide if transmitting simultaneously.
-  - *Distance-2 (Hidden Terminal) Collision:* Two nodes out of range of each other, but sharing a common neighbor, corrupt packets at that mutual receiver.
-- **Spatial Concurrency (Reuse):** Nodes separated by $\ge 3$ hops can safely reuse timeslots without mutual interference.
-- **Goal:** Minimize frame length $K$ (maximizes per-node throughput and minimizes packet latency).
+### Slide 2: The Problem
+- **Title:** Two ways to collide, one way to save slots
+- **Core Concept:** TDMA operates on a single shared frequency with a repeating frame of K slots. Fewer slots means each radio talks more often.
+- **Three Interference & Protocol Rules:**
+  - *Rule 1 (Direct link):* Adjacent radios within 500 m direct range collide if transmitting concurrently. Requires distinct slots.
+  - *Rule 2 (Hidden terminal):* Two non-adjacent radios with a shared neighbour corrupt reception at that mutual node. Requires distinct slots.
+  - *Rule 3 (Spatial reuse):* Radios 3+ hops apart cannot interfere with each other's receptions and safely share the same timeslot, multiplying channel capacity.
+- **Native Visual:** A → B ← C native diagram with "under 500 m" link labels, out-of-range dashed connection between A and C, and caption: *"A and C are out of range, yet if both transmit in the same slot they collide at B."*
 
 ---
 
-### Slide 3: Mathematical Graph Formulation
-- **Connectivity Graph $G = (V, E)$:** Edges where Euclidean distance $d(u, v) \le 500.0\text{ m}$ (inclusive).
-- **Conflict Graph $G_{conflict} = G^2$:** Edges between all pairs with shortest path $\le 2$ hops.
-- **Equivalence Theorem:** Distance-2 vertex coloring of $G$ is mathematically isomorphic to ordinary vertex coloring of $G^2$.
-- **Complexity:** NP-hard in general; bounded by $\omega(G^2) \le \chi(G^2) \le \Delta(G^2) + 1$.
+### Slide 3: The Model
+- **Title:** Distance-2 coloring is just ordinary coloring of the squared graph
+- **Three Formulation Steps:**
+  - *(1) Build G:* Undirected edge if Euclidean distance $d \le 500.0$ m (exactly 500 m counts, $10^{-9}$ m tolerance).
+  - *(2) Square it ($G^2$):* Using `nx.power(G, 2)`. Edges exist between 1-hop and 2-hop neighbors so hidden terminals become adjacent.
+  - *(3) Color $G^2$:* Color equals timeslot. Pairs 3+ hops apart stay unconnected so they may reuse a color.
+- **Native Visuals:**
+  - 4-node line diagram A–B–C–D colored with Slots 0, 1, 2, 0 demonstrating safe spatial reuse across 3 hops (*"A and D are 3 hops apart, so they reuse slot 0"*).
+  - Bounds & complexity panel: $\omega(G^2) \le \chi(G^2) \le \Delta(G^2) + 1$ with explanation that graph coloring is NP-hard, motivating heuristics paired with exact lower bounds.
 
 ---
 
-### Slide 4: Algorithmic Architecture & Heuristics
-- **1. Largest-Degree-First (LDF / Welsh-Powell):** Colors high-degree conflict bottlenecks first; $\mathcal{O}(V \log V + E)$.
-- **2. DSATUR (Degree of Saturation):** Dynamic greedy heuristic choosing vertex with maximum colored neighbor diversity; $\mathcal{O}(V^2 + E)$.
-- **3. Smallest-Last (Degeneracy):** Matula-Beck ordering eliminating minimum-degree nodes; bounds coloring by graph degeneracy.
-- **4. Randomized Restarts:** Evaluates $N=1000$ seeded random permutations to escape local minima.
-- **5. Local Search & Color Reduction:** Kempe-chain 2-color swaps and min-conflicts Tabu search to eliminate highest color classes.
+### Slide 4: Algorithms
+- **Title:** Five heuristics, two exact solvers, one independent checker
+- **Native Comparative Table:**
+  - *Largest-Degree-First (LDF):* Orders nodes by conflict degree; colors high-degree bottlenecks first. $\mathcal{O}(V \log V + E)$ (~0.06 ms).
+  - *DSATUR:* Greedy saturation picking node with highest colored-neighbor diversity. $\mathcal{O}(V^2 + E)$ (~0.15 ms).
+  - *Smallest-Last:* Reverse elimination ordering bounded by degeneracy. $\mathcal{O}(V + E)$ (~0.20 ms).
+  - *Random Restarts:* 1000 seeded orders, retains the best observed schedule. (~24 ms).
+  - *Local Search:* Kempe-chain swaps plus tabu search, up to 2000 steps to trim top color. (~50 ms).
+  - *CP-SAT Exact:* 0-1 ILP with maximum-clique pre-coloring for symmetry breaking. Proven optimum (~0.8 ms).
+  - *Branch & Bound Exact:* Backtracking with DSATUR branching, no dependencies, used as fallback.
+- **Architecture Callout:** The schedule is the best result across methods, the exact solver is the yardstick, and a separate BFS verifier checks the final schedule.
 
 ---
 
-### Slide 5: Exact Solvers & Proof of Optimality
-- **Dual-Solver Strategy:**
-  - *Primary Solver:* Google OR-Tools CP-SAT (0-1 ILP with symmetry breaking).
-  - *Fallback Solver:* Pure-Python DSATUR Branch-and-Bound Backtracking.
-- **Symmetry Breaking:** Maximum clique $\omega(G^2)$ is pre-assigned fixed colors $0 \dots \omega-1$.
-- **Lower Bound Pruning:** Search halts immediately once upper bound matches clique lower bound.
-- **Performance:** Solves 16-node topologies in about 1 ms or less.
+### Slide 5: The 4x4 Grid
+- **Title:** The 4x4 grid needs 9 slots, and four corners share one
+- **Native 4x4 Grid Diagram:**
+  - 16 nodes arranged from Node_01 at bottom-left (0,0) to Node_16 at top-right (900,900).
+  - Drawn using the real schedule from `examples/grid_schedule.json` (Node_01 to Node_16 = slots 8, 4, 5, 8, 6, 0, 1, 6, 7, 2, 3, 7, 8, 4, 5, 8).
+  - Validated by running the independent verifier prior to rendering.
+  - Four corner radios (Nodes 1, 4, 13, 16) ringed with a dashed amber ring sharing Slot 8.
+- **Mathematical Proof of Optimality:**
+  - (1) Diagonal distance $300\sqrt{2} = 424.3$ m is in direct radio range ($\le 500$ m).
+  - (2) Any $3 \times 3$ subgrid of 9 nodes has all pairs within 2 hops in $G$.
+  - (3) Therefore, those 9 nodes form a 9-clique in $G^2$ (every pair conflicts).
+  - (4) $\chi(G^2) \ge \omega(G^2) = 9$. No schedule can use fewer than 9 slots, and the solver finds exactly 9.
+- **Key Metrics:** 42 edges in $G$, 90 edges in $G^2$, 15 max degree in $G^2$.
+- **Brief Clarification:** The assignment sample's 5-slot table is an illustrative format example with partial coordinates, not a target.
 
 ---
 
-### Slide 6: Empirical Results & Benchmark Suite
-- **4x4 Grid (300 m spacing):**
-  - All heuristics found **9 slots** (verified exact optimum, 0 gap).
-  - Four corners (Nodes 1, 4, 13, 16) all share Slot 8!
-- **Sparse Linear Chain (350 m spacing):**
-  - Requires exactly **3 slots** (repetition pattern: $1, 2, 0, 1, 2, 0\dots$).
-- **Dense Cluster ($d \le 500$ m):**
-  - Forms $K_{16}$ clique; requires **16 slots** (no spatial reuse possible).
-- **Two Disconnected Clusters:**
-  - Full spatial reuse across clusters; requires **8 slots** instead of 16.
+### Slide 6: Benchmarks
+- **Title:** Every heuristic matched the exact optimum on all four topologies
+- **Native Clustered Bar Chart:** Exact optimum vs best heuristic across 4 benchmark topologies:
+  - 4x4 Grid (300 m): 9 vs 9
+  - Sparse Linear (350 m): 3 vs 3
+  - Dense Cluster (≤500 m): 16 vs 16
+  - Two Disconnected Clusters (3000 m gap): 8 vs 8
+- **Topology Summary Table:**
+  - 4x4 Grid: 42 $G$ edges, 90 $G^2$ edges, 9 slots
+  - Sparse Line: 15 $G$ edges, 29 $G^2$ edges, 3 slots
+  - Dense Cluster: 120 $G$ edges, 120 $G^2$ edges, 16 slots
+  - Two Clusters: 56 $G$ edges, 56 $G^2$ edges, 8 slots
+- **Analysis Cards:**
+  - *What the numbers say:* Dense cluster is a 16-clique so 16 is forced; two clusters 3000 m apart reuse slots 0 to 7, halving the frame.
+  - *Cost on 16 nodes:* Greedy and DSATUR under 0.3 ms, 1000 restarts about 15 to 37 ms, exact solve about 0.2 to 1.2 ms.
 
 ---
 
-### Slide 7: Independent Schedule Verifier
-- **Design Principle:** Absolute separation of concerns—zero shared code with coloring or $G^2$ construction.
-- **BFS Shortest-Path Checks:** Evaluates hop distances directly on physical graph $G$.
-- **Assertions Enforced:**
-  - Every node has exactly one slot (Coverage check).
-  - Slots are contiguous $0 \dots K-1$ (Contiguity check).
-  - No pairs within 1 or 2 hops share slots (Conflict freedom).
-- **Outcome:** Catches deliberate collisions, missing nodes, and gaps; exits non-zero on failure.
+### Slide 7: Verification and Part 2
+- **Title:** Verified independently; EMANE bridge designed and tested offline
+- **Top Row Cards:**
+  - *Independent Verifier:* BFS hop distances on raw $G$, zero shared code with colouring. Checks one slot per node, contiguous slots $0..K-1$, no pair within 2 hops shares a slot. All 47 tests pass, including property tests and a fallback solver that matches CP-SAT.
+  - *EMANE Range Modelling (Design Only):* EMANE does not know the 500 m rule natively. Radios communicate over multicast OTA; locations and pathloss must be calibrated to ~500 m effective range, otherwise all 16 radios hear each other globally and the schedule would collide. Status: planned, not run.
+- **Native 5-Box Pipeline:**
+  - `[Python Optimizer]` → `[Schedule JSON]` → `[Bridge Script]` → `[Schedule XML]` → `[EMANE Nodes]`
+  - Explicit boundary labels:
+    - *TESTED OFFLINE:* JSON to XML translation, node-to-NEM mapping, round-trip schema check.
+    - *DESIGN ONLY:* live emulation, Docker build, packet-level slot enforcement.
 
 ---
 
-### Slide 8: EMANE Emulation Bridge (Part 2)
-- **High-Fidelity Virtual Testbed:** Integrates with EMANE `tdmaeventschedulerradiomodel`.
-- **Profiles Created:**
-  - 1 ms slot duration (`1000` $\mu\text{s}$), 50 $\mu\text{s}$ guard time.
-  - 2.4 GHz carrier, 20 MHz bandwidth, 0 dBm transmit power.
-- **Parameter Verification:** Parameter names checked against official EMANE sources; live run not performed.
-- **Automated Translator (`schedule_to_emane.py`):**
-  - Converts JSON schedule to native EMANE schedule XML.
-  - Generates Python `emane.events.TDMAScheduleEvent` publisher script.
-  - Round-trip validation test suite passes with 100% parity.
-
----
-
-### Slide 9: Emulation Test Plan & Engineering Decisions
-- **PLANNED TEST PLAN (not yet run):**
-  - Valid schedule: expect delivery only in scheduled slots (planned)
-  - Deliberately conflicting schedule: expect collision/loss (planned)
-  - Range calibration: pathloss tuned to ~500 m (planned)
-- **Key Engineering Decisions:**
-  - Float epsilon ($10^{-9}$) ensures exact 500.0 m points are included.
-  - Duplicate coordinate validation detects impossible physical co-locations.
-  - Deterministic random seed ensures reproducible schedules.
-
----
-
-### Slide 10: Conclusion & Future Roadmap
-- **Key Takeaways:**
-  - Part 1 complete and verified; Part 2 designed and tested offline.
-  - 100% test coverage (47 pytest tests passing).
-  - EMANE bridge: offline round-trip tested; live run pending.
-- **Future Enhancements:**
-  - Multi-frequency TDMA (2D time-frequency grid).
-  - Mobile ad-hoc networks with distributed scheduling (DRAND).
-  - Directed link-based STDMA.
+### Slide 8: Status
+- **Title:** What is proven, what is pending, and what comes next
+- **Three Structured Columns:**
+  - **PROVEN:**
+    - 9, 3, 16, 8 slots each equal to the exact optimum.
+    - Independent verifier passes on all topologies.
+    - CP-SAT and pure-Python solver agree.
+    - 47 automated tests pass on a fresh clone.
+    - Exact 500.0 m float tolerance ($10^{-9}$ m) and duplicate rejection.
+  - **NOT YET RUN:**
+    - Live EMANE emulation in multi-node container.
+    - Docker build and live TAP interface setup.
+    - Packet-level slot enforcement with ping/iperf.
+    - Pathloss calibration to about 500 m.
+    - Deliberate conflict injection test.
+  - **NEXT:**
+    - Multi-channel time $\times$ frequency colouring across orthogonal bands.
+    - Mobility and dynamic re-scheduling (DRAND / C-TDMA protocols).
+    - Link-level scheduling (directed spatial TDMA).
+    - Larger topologies to stress the heuristics ($n = 50$ to 500).
