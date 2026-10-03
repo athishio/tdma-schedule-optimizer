@@ -1,4 +1,4 @@
-# TDMA Schedule Planner and Spatial Reuse Optimizer: Engineering Design Document
+# TDMA Schedule Optimizer: Design and Implementation Notes
 
 **Author:** Athish M  
 **Repository:** `tdma-schedule-optimizer`  
@@ -7,321 +7,231 @@
 
 ---
 
-## 1. Executive Summary & Problem Understanding
+## 1. The Problem in My Own Words
 
-### 1.1 The Wireless Medium & TDMA Protocol Mechanics
-In shared-spectrum radio frequency (RF) networks, transceivers share a common wireless channel. If two or more transmitters emit RF energy simultaneously within reception range of a common receiver, their electromagnetic waveforms interfere destructively, causing packet corruption (collision).
+I built this optimizer to solve broadcast scheduling for radio nodes on a shared 2.4 GHz wireless channel. When nodes share a radio channel, uncontrolled transmissions cause packet collisions. Time Division Multiple Access (TDMA) fixes this by breaking time into repeating frames of fixed timeslots. Each node gets one or more slots to transmit.
 
-**Time Division Multiple Access (TDMA)** eliminates uncontrolled collisions by discretizing time into repeating sequences called **frames**. Each frame is subdivided into a fixed number of equal-duration **timeslots** ($T_{slot}$). Nodes are allocated designated slots in which they possess exclusive transmission rights.
+The network sits on a 2D plane with an omnidirectional radio range of 500.0 meters. A valid schedule must handle two collision types:
 
-```
-Time Axis --->
-+---------------+---------------+---------------+---------------+---------------+
-| Slot 0 (1 ms) | Slot 1 (1 ms) | Slot 2 (1 ms) |      ...      | Slot K-1      |  (Frame Length = K slots)
-+---------------+---------------+---------------+---------------+---------------+
-|<----------------------------- Repeating TDMA Frame -------------------------->|
-```
+1. **Distance-1 collision:** Two nodes within 500 meters cannot transmit in the same slot. If they transmit together, each radio drowns out the other and neither can receive.
+2. **Distance-2 collision (the hidden-terminal problem):** Two nodes might be more than 500 meters apart, but share a common neighbor within 500 meters of both. If both transmit at the same time, the neighbor hears overlapping signals and receives garbage.
+3. **Spatial reuse:** Two nodes that are 3 or more hops apart in the network graph can transmit in the same timeslot. No shared receiver can hear both, so their transmissions do not collide.
 
-### 1.2 Interference Modalities & Spatial Reuse
-The system models static transceivers positioned at 2D Euclidean coordinates $(x, y) \in \mathbb{R}^2$ with an omnidirectional communication radius $R = 500.0\text{ m}$. To ensure conflict-free broadcast scheduling, the schedule must resolve two distinct collision phenomena while maximizing spatial concurrency:
-
-1. **Distance-1 Conflict (Direct In-Range Collision):**
-   - **Condition:** Two nodes $u$ and $v$ have Euclidean distance $d(u, v) \le R$.
-   - **Mechanism:** If $u$ and $v$ transmit concurrently, neither can decode the other's transmission due to mutual receiver saturation (half-duplex constraint) and overlapping RF emissions.
-   - **Protocol Invariant:** $u$ and $v$ must **never** share a timeslot.
-
-2. **Distance-2 Conflict (The Hidden Terminal Problem):**
-   - **Condition:** Two nodes $u$ and $v$ are not in direct range ($d(u, v) > R$), but share a mutual neighbor $w$ such that $d(u, w) \le R$ and $d(v, w) \le R$.
-   - **Mechanism:** Node $u$ cannot sense node $v$'s transmission (hidden terminal). If both transmit in the same slot, their signals superimpose destructively at $w$, causing collision and packet loss at the intermediate receiver.
-   - **Protocol Invariant:** $u$ and $v$ must **never** share a timeslot.
-
-3. **Spatial Reuse (Distance $\ge 3$ Hops):**
-   - **Condition:** Nodes $u$ and $v$ have a shortest-path hop distance $h(u, v) \ge 3$ in the connectivity topology (or belong to disconnected graph components).
-   - **Mechanism:** No common receiver can detect signals from both $u$ and $v$ with sufficient energy to corrupt reception.
-   - **Optimization Objective:** Nodes separated by $\ge 3$ hops **may concurrently transmit in the same timeslot**, maximizing network throughput and spectral efficiency.
-
-**Global Goal:** Minimize the total frame length (number of unique slots $K$). Minimizing $K$ maximizes per-node channel access frequency, minimizes packet latency, and maximizes aggregate network throughput.
+My goal is to find a conflict-free schedule that uses the minimum number of timeslots. A shorter frame means every node transmits more frequently, latency drops, and overall network throughput increases.
 
 ---
 
-## 2. Mathematical Modeling & Graph Theory
+## 2. How I Modelled It
 
-### 2.1 Graph Formulation
-Let $V = \{v_1, v_2, \dots, v_n\}$ represent the set of radio nodes, where each node $v_i$ is located at coordinates $p(v_i) = (x_i, y_i)$.
+I modelled the radio network as an undirected physical graph $G = (V, E)$. The vertices $V$ are radio transceivers with coordinates $(x, y)$. An edge exists between node $u$ and node $v$ if their Euclidean distance satisfies:
 
-1. **Physical Connectivity Graph $G = (V, E)$:**
-   An undirected edge $(u, v) \in E$ exists if and only if the physical Euclidean distance satisfies:
-   $$d(u, v) = \sqrt{(x_u - x_v)^2 + (y_u - y_v)^2} \le R$$
-   *Boundary Rule:* Exactly $500.0\text{ m}$ is considered in-range. A numerical tolerance $\epsilon = 10^{-9}\text{ m}$ is applied during edge construction to prevent floating-point roundoff exclusion.
+$$d(u, v) = \sqrt{(x_u - x_v)^2 + (y_u - y_v)^2} \le 500.0\text{ m}$$
 
-2. **Conflict Graph $G_{conflict} = G^2$ (The Graph Square):**
-   The square of a graph $G$, denoted $G^2$, is defined on the same vertex set $V$, with an edge $(u, v) \in E(G^2)$ if and only if the shortest-path hop distance in $G$ satisfies:
-   $$1 \le \text{dist}_G(u, v) \le 2$$
+I treat a distance of exactly 500.0 m as in range, applying a numerical tolerance of $10^{-9}$ meters to avoid floating-point roundoff issues.
 
-### 2.2 Proof of Equivalence: Distance-2 Coloring of $G \equiv$ Vertex Coloring of $G^2$
-*Theorem:* A TDMA schedule mapping $c: V \rightarrow \{0, 1, \dots, K-1\}$ is conflict-free if and only if $c$ is a valid vertex coloring of $G^2$.
+To handle both 1-hop and 2-hop conflicts directly, I construct the squared graph $G^2$. The graph $G^2$ has the same vertices as $G$. An edge exists between $u$ and $v$ in $G^2$ if the shortest path distance in $G$ is 1 or 2 hops:
 
-*Proof:*
-- $(\Rightarrow)$ Suppose $c$ is a valid conflict-free schedule. If $(u, v) \in E(G^2)$, then by definition of graph power, $\text{dist}_G(u, v) \in \{1, 2\}$. If $\text{dist}_G(u, v) = 1$, $u$ and $v$ are adjacent in $G$ (distance-1 conflict). If $\text{dist}_G(u, v) = 2$, $u$ and $v$ share an intermediate neighbor $w$ (distance-2 hidden terminal conflict). In both cases, the protocol mandates $c(u) \neq c(v)$. Thus, no two adjacent vertices in $G^2$ share a color.
-- $(\Leftarrow)$ Suppose $c$ is a valid vertex coloring of $G^2$. If two nodes $u, v$ have $\text{dist}_G(u, v) \le 2$, then by definition $(u, v) \in E(G^2)$, which implies $c(u) \neq c(v)$. If $\text{dist}_G(u, v) \ge 3$, $(u, v) \notin E(G^2)$, allowing $c(u) = c(v)$ (valid spatial reuse). Thus, $c$ satisfies all TDMA protocol requirements. $\blacksquare$
+$$1 \le \text{dist}_G(u, v) \le 2$$
 
-### 2.3 Theoretical Complexity & Bounds
-- **NP-Hardness:** Determining the minimum chromatic number $\chi(G)$ is NP-hard (Karp, 1972). Even for unit disk graphs (UDG), distance-2 coloring is strongly NP-hard.
-- **Lower Bound (Clique Number):**
-  $$\chi(G^2) \ge \omega(G^2)$$
-  Where $\omega(G^2)$ is the maximum clique size in $G^2$. If a subset of nodes $C \subseteq V$ pairwise conflict within 2 hops, each node in $C$ requires a distinct timeslot.
-- **Upper Bound (Greedy Degree Bound):**
-  $$\chi(G^2) \le \Delta(G^2) + 1$$
-  Where $\Delta(G^2)$ is the maximum node degree in the conflict graph $G^2$.
+With this construction, a valid TDMA schedule is equivalent to a proper vertex colouring of $G^2$. Two nodes that share an edge in $G^2$ conflict and must receive different colors (slots). Two nodes with no edge in $G^2$ are at least 3 hops apart and can safely share a slot.
+
+Vertex colouring on arbitrary graphs is NP-hard. Even for unit-disk graphs, distance-2 colouring remains NP-hard. I use two graph properties to bound the required slots:
+
+- **Lower bound:** The maximum clique size $\omega(G^2)$. If a group of nodes all pairwise conflict within 2 hops, every node in that group needs a distinct slot.
+- **Upper bound:** The maximum vertex degree $\Delta(G^2) + 1$, achievable by greedy colouring.
 
 ---
 
-## 3. Algorithm Design & Heuristic Architecture
+## 3. What I Tried and What Happened
 
-The optimizer implements five diverse heuristics complemented by two exact solvers:
+I implemented five heuristic algorithms to find schedules quickly, and two exact solvers to verify whether those schedules reached the mathematical minimum.
 
-```
-                                 [Conflict Graph G^2]
-                                          |
-        +------------------+--------------+-------------+------------------+
-        |                  |              |             |                  |
-        v                  v              v             v                  v
-     1. LDF            2. DSATUR    3. Smallest-Last  4. Random Restarts  5. Local Search
-   (O(V log V))        (O(V^2))        (O(V + E))        (N=1000)        (Kempe + Tabu)
-        \                  |              |             |                  /
-         +-----------------+--------------+-------------+-----------------+
-                                          |
-                              Candidate Best Schedule
-                                          |
-                           [Exact Solver Verification]
-                             - Google OR-Tools CP-SAT
-                             - Pure-Python BnB Fallback
-                                          |
-                           [Compaction: Contiguous 0..K-1]
-                                          |
-                        [Independent Verifier (BFS on G)]
-```
+### 3.1 Five Heuristics
 
-### 3.1 Largest-Degree-First (LDF / Welsh-Powell)
-- **Concept:** Highly connected nodes in $G^2$ pose the greatest constraint on neighboring allocations. Coloring high-degree vertices first minimizes bottlenecking later in the sequence.
-- **Ordering:** Nodes sorted descending by $\text{deg}_{G^2}(v)$, with deterministic secondary tie-breaking by node identifier string.
-- **Color Assignment:** First-fit greedy: assigns the smallest non-negative integer color $c \ge 0$ not used by any colored neighbor in $G^2$.
-- **Complexity:** $\mathcal{O}(|V| \log |V| + |E(G^2)|)$.
+I evaluated all five heuristics on the 4x4 grid topology (16 nodes, 300 m spacing, 500 m range):
 
-### 3.2 Degree of Saturation (DSATUR - Brélaz, 1979)
-- **Concept:** Dynamically measures the "urgency" of uncolored vertices. The **saturation degree** $\rho(v)$ is the number of distinct colors assigned to $v$'s colored neighbors in $G^2$.
-- **Selection Rule:** At each step, select an uncolored node $u = \arg\max_{v} \rho(v)$.
-- **Tie-Breaking:**
-  1. Primary: Maximum uncolored degree in the remaining subgraph.
-  2. Secondary: Maximum overall degree in $G^2$.
-  3. Tertiary: Lexicographical node name string.
-- **Complexity:** $\mathcal{O}(|V|^2 + |E(G^2)|)$.
-- **Rationale:** DSATUR consistently achieves within 0–1 slot of the theoretical chromatic number on geometric random graphs.
+1. **Largest-Degree-First (LDF / Welsh-Powell):** Sorts nodes descending by degree in $G^2$ and colors greedily. It assigned 9 slots in 0.06 ms. It was the fastest heuristic.
+2. **DSATUR (Brélaz):** Selects the uncolored vertex with the highest number of distinct colors among its neighbors. It assigned 9 slots in 0.25 ms.
+3. **Smallest-Last (Matula and Beck):** Repeatedly removes the minimum-degree vertex from the remaining subgraph, then colors in reverse order. It assigned 9 slots in 0.09 ms.
+4. **Randomized Restarts:** Evaluates 1000 seeded random vertex permutations with greedy first-fit. It consistently found 9 slots in 60.8 ms.
+5. **Local Search (Color Reduction):** Starts from the best greedy schedule and attempts to eliminate the highest slot using Kempe-chain swaps and tabu search. On the 4x4 grid, it attempted to reduce 9 slots to 8, but correctly stopped because 8 slots is mathematically impossible.
 
-### 3.3 Smallest-Last (Degeneracy / Matula & Beck, 1983)
-- **Concept:** Exploits $k$-degeneracy. Vertices that can be colored with the lowest degree in a subgraph are eliminated first and placed at the bottom of an allocation stack.
-- **Elimination:** Successively remove vertex $v$ with minimum degree in the induced remaining subgraph.
-- **Coloring:** Reverse the elimination stack (smallest-last order) and color greedily.
-- **Bound Guarantee:** Guarantees schedule length $\le \max_{H \subseteq G^2} \delta(H) + 1$, often outperforming static degree orderings in non-uniform clustering.
-- **Complexity:** $\mathcal{O}(|V| + |E(G^2)|)$.
+All five heuristics matched the theoretical minimum of 9 slots on the 4x4 grid. LDF proved to be the fastest option.
 
-### 3.4 Seeded Randomized Restarts
-- **Concept:** Explores alternative permutation basins by evaluating $N = 1000$ seeded random permutations of $V$, executing first-fit greedy coloring on each.
-- **Determinism:** Seeded via `random.Random(seed)` (default: 42) ensuring reproducible schedules across runs.
-- **Complexity:** $\mathcal{O}(N \cdot (|V| + |E(G^2)|))$.
+### 3.2 Two Exact Solvers
 
-### 3.5 Local Search & Color Reduction Pass
-- **Concept:** Starting from the best heuristic schedule (using $K$ slots), attempts to compress the frame to $K-1$ slots by completely clearing slot $K-1$.
-- **Three-Phase Reduction Strategy:**
-  1. *Direct Recoloring:* For each node in slot $K-1$, attempt assignment to an existing conflict-free slot in $\{0, \dots, K-2\}$.
-  2. *Kempe-Chain Swaps:* For nodes with residual conflicts, construct 2-color induced subgraphs $G^2[c_1, c_2]$ and swap colors within connected components to isolate the target node.
-  3. *Min-Conflicts Tabu Search:* If direct swaps fail, assign target nodes to colors minimizing neighbor conflicts and run tabu search (tenure $= \max(5, |V|/3)$) over up to 2000 iterations to eliminate remaining violations.
-  4. Repeat iteratively whenever a reduction to $K-1$ succeeds.
+Heuristics cannot prove optimality on their own. I added two exact solvers to certify the true minimum frame length:
 
-### 3.6 Exact Solvers
-1. **Google OR-Tools CP-SAT:**
-   - Formulated as a Constraint Satisfaction Optimization Problem:
-     - Binary variables $x_{v, c} \in \{0, 1\}$ denoting node $v$ assigned slot $c$.
-     - Binary indicator $y_c \in \{0, 1\}$ denoting slot $c$ is active.
-     - Coverage: $\sum_{c=0}^{K_{ub}-1} x_{v, c} = 1, \quad \forall v \in V$.
-     - Conflict: $x_{u, c} + x_{v, c} \le y_c, \quad \forall (u, v) \in E(G^2), \forall c$.
-     - Symmetry Breaking: $y_0 \ge y_1 \ge y_2 \dots$; Pre-color maximum clique $C$ such that $x_{C_i, i} = 1$.
-     - Objective: Minimize $\sum_{c} y_c$.
-2. **Pure-Python Branch-and-Bound Backtracking (Zero-Dependency Fallback):**
-   - Implements a dedicated branch-and-bound solver with:
-     - Pre-coloring of the maximum clique $\omega(G^2)$ to eliminate color permutation symmetry.
-     - Pruning whenever current colors used $\ge$ best-known upper bound.
-     - Immediate termination when upper bound equals clique lower bound $\omega(G^2)$.
-     - DSATUR variable branching order.
+1. **Google OR-Tools CP-SAT:** Formulates the problem as constraint optimization with binary assignment variables $x_{v,c}$ and slot indicators $y_c$. I broke color permutation symmetry by pre-colouring a maximum clique in $G^2$. It solved the 4x4 grid in 0.60 ms, confirming that 9 slots is the exact optimum.
+2. **Pure-Python Branch-and-Bound Fallback:** A zero-dependency backtracking solver. It uses clique pre-colouring, lower-bound pruning, and DSATUR variable ordering. It serves as a standalone fallback when OR-Tools is not installed.
 
-### 3.7 Considered but Not Implemented
-- **Genetic Algorithms (GA):** Considered for global search, but stochastic evaluation offers no guarantee or proof of optimality, requires complex chromosome encodings for graph coloring, and cannot strictly enforce hard distance-2 constraints without auxiliary repair heuristics.
-- **Simulated Annealing (SA):** Unconstrained energy formulations with conflict penalties require fragile temperature schedule tuning and frequently terminate with lingering violations, requiring secondary deterministic repair passes.
-- **Plain ILP without Symmetry Breaking:** Standard 0-1 ILP formulations suffer from massive search tree expansion due to symmetric color permutations (any permutation of color indices represents an identical physical schedule). Adding maximum-clique pre-coloring breaks this symmetry by anchoring $\omega(G^2)$ colors upfront.
+### 3.3 What I Considered but Rejected
+
+During design, I considered several alternative optimization approaches:
+
+- **Genetic Algorithms:** I rejected genetic algorithms because their stochastic search provides no guarantee of optimality. Furthermore, distance-2 graph coloring has strict hard constraints, and random crossover or mutation operators frequently produce invalid schedules that require expensive repair routines.
+- **Simulated Annealing:** I rejected simulated annealing because penalty tuning on soft conflict formulations is fragile. It often converges to near-valid states with residual collisions, requiring an auxiliary deterministic coloring pass.
+- **Plain ILP without Symmetry Breaking:** A naive ILP formulation assigns colors $0 \dots K-1$. Because any permutation of slot assignments is equivalent, the solver explores thousands of symmetric branches. Anchoring a maximum clique upfront breaks this symmetry and allows CP-SAT to solve the 4x4 grid in under 1 millisecond.
 
 ---
 
-## 4. Empirical Results & Topology Benchmarks
+## 4. Results on the Benchmark Topologies
 
-All metrics reported below were generated by executing the codebase directly against the configured benchmark suite (`benchmarks.py`, seed: 42):
+I tested the optimizer across four representative topologies. Every topology matched the exact theoretical optimum with zero heuristic gap.
 
-### 4.1 Topology Comparison Table
+### 4.1 Topology Summary
 
-| Topology Scenario | Nodes ($|V|$) | $G$ Edges | $G^2$ Edges | Max Deg $\Delta(G^2)$ | Exact Optimum ($\chi$) | Best Heuristic | Heuristic Gap | Exact Runtime |
+| Topology Scenario | Nodes ($|V|$) | $G$ Edges | $G^2$ Edges | Max Deg $\Delta(G^2)$ | Exact Optimum ($\chi$) | Best Heuristic | Gap | Exact Runtime |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **1. 4x4 Grid (300 m spacing)** | 16 | 42 | 90 | 15 | **9 slots** | **9 slots** | **0 (Optimal)** | 0.478 ms |
-| **2. Sparse Linear Chain (350 m)**| 16 | 15 | 29 | 4 | **3 slots** | **3 slots** | **0 (Optimal)** | 0.171 ms |
-| **3. Dense Cluster ($d \le 500$ m)**| 16 | 120 | 120 | 15 | **16 slots**| **16 slots**| **0 (Optimal)** | 0.222 ms |
-| **4. Two Disconnected Clusters** | 16 | 56 | 56 | 7 | **8 slots** | **8 slots** | **0 (Optimal)** | 0.304 ms |
+| **1. 4x4 Grid (300 m spacing)** | 16 | 42 | 90 | 15 | **9 slots** | **9 slots** | 0 | 0.48 ms |
+| **2. Sparse Linear (350 m spacing)** | 16 | 15 | 29 | 4 | **3 slots** | **3 slots** | 0 | 0.17 ms |
+| **3. Dense Cluster ($d \le 500$ m)** | 16 | 120 | 120 | 15 | **16 slots** | **16 slots** | 0 | 0.22 ms |
+| **4. Disconnected Clusters** | 16 | 56 | 56 | 7 | **8 slots** | **8 slots** | 0 | 0.30 ms |
 
-### 4.2 Detailed Analysis by Topology
+### 4.2 Detailed Look at the 4x4 Grid
 
-#### Topology 1: 4x4 Grid (300 m Spacing)
-- **Physical Layout:** Nodes arranged on a $4 \times 4$ lattice from $(0, 0)$ to $(900, 900)$ meters.
-- **RF Connectivity:**
-  - Horizontal/vertical neighbor distance: $300.0\text{ m} \le 500\text{ m}$ (Connected in $G$).
-  - Diagonal neighbor distance: $\sqrt{300^2 + 300^2} \approx 424.26\text{ m} \le 500\text{ m}$ (Connected in $G$).
-- **Mathematical Invariant:** Any $3 \times 3$ subgrid forms a clique of size 9 in $G^2$ because all pairs within that $3 \times 3$ subgrid are at most 2 hops apart. Therefore, $\omega(G^2) = 9$.
-- **Spatial Reuse Result:**
-  All four corner nodes—`Node_01` $(0, 0)$, `Node_04` $(900, 0)$, `Node_13` $(0, 900)$, and `Node_16` $(900, 900)$—are separated by $\ge 3$ hops in $G$. The optimizer successfully co-allocates all four corner nodes to **Slot 8**!
-  Likewise, edge pairs (`Node_02` & `Node_14`), (`Node_03` & `Node_15`), (`Node_05` & `Node_08`), and (`Node_09` & `Node_12`) achieve spatial reuse.
-- **Frame Length:** Achieves true theoretical minimum: **9 slots**.
+Why does the 4x4 grid with 300 m spacing require exactly 9 slots?
 
-#### Topology 2: Sparse Linear Chain (350 m Spacing)
-- **Physical Layout:** 16 nodes arranged along a single axis $x_i = i \times 350\text{ m}$.
-- **Hop Distances:** Node $i$ connects only to $i-1$ and $i+1$. Hop distance $h(i, j) = |i - j|$.
-- **Spatial Reuse Result:** Nodes with $|i - j| \ge 3$ reuse slots. Frame length matches the theoretical 3-slot coloring of a path graph $P_n^2$:
-  $$\text{Pattern: } 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1$$
-- **Frame Length:** **3 slots**.
+- Horizontal and vertical neighbors sit 300 m apart, within the 500 m radio range.
+- Diagonal neighbors sit $\sqrt{300^2 + 300^2} \approx 424.26$ m apart, also within the 500 m range.
+- Any $3 \times 3$ block of 9 nodes has a maximum path distance of 2 hops in $G$.
+- Therefore, all 9 nodes in any $3 \times 3$ block conflict with each other in $G^2$, forming a clique of size 9 ($\omega(G^2) \ge 9$).
+- Because the chromatic number $\chi(G^2) \ge \omega(G^2)$, no schedule can use fewer than 9 slots.
 
-#### Topology 3: Dense Cluster (All Nodes in Range)
-- **Physical Layout:** 16 nodes randomly clustered within a $250 \times 250\text{ m}$ footprint.
-- **RF Connectivity:** Every node pair is within $500\text{ m}$. $G$ and $G^2$ form the complete graph $K_{16}$ (120 edges).
-- **Frame Length:** Exactly **16 slots**. Zero spatial reuse possible; each node requires an exclusive slot.
+Spatial reuse occurs at the edges and corners. The four corner nodes (Node_01 at (0,0), Node_04 at (900,0), Node_13 at (0,900), and Node_16 at (900,900)) sit 3 or more hops apart. The optimizer groups all four corner nodes into Slot 8.
 
-#### Topology 4: Disconnected Clusters (Two 8-Node Enclaves)
-- **Physical Layout:** Cluster A at $(0, 0)$, Cluster B at $(3000, 3000)$ meters.
-- **RF Connectivity:** Distance between clusters is $\approx 4242\text{ m} \gg 1000\text{ m}$ ($\infty$ hops).
-- **Spatial Reuse Result:** Nodes in Cluster A and Cluster B completely duplicate slots $0..7$. Frame length is $\max(8, 8) =$ **8 slots** instead of 16.
+### 4.3 Real CLI Output
 
-### 4.3 Why This Differs from the Brief's Illustrative Sample Output
-The assignment brief provides an illustrative sample report showing `"Optimized Frame Length : 5 unique timeslots"`. The brief's sample shows 5 slots but does not give all coordinates, so it is treated as an illustrative format example, not a target. Our independent verifier is the correctness check.
+Here is the raw output from executing `python -m tdma.cli --coords-file examples/grid_4x4_300m.json`:
 
-**Mathematical Proof of Lower Bound:**
-In the specified 4x4 grid topology with 300 m spacing and $R = 500.0\text{ m}$:
-1. Adjacent nodes along rows and columns are separated by 300.0 m $\le 500.0\text{ m}$ (in range, distance 1).
-2. Diagonal neighbors are separated by $\sqrt{300^2 + 300^2} \approx 424.26\text{ m} \le 500.0\text{ m}$ (in range, distance 1).
-3. Any $3 \times 3$ subgrid (9 nodes, e.g., Nodes 1, 2, 3, 5, 6, 7, 9, 10, 11) has maximum hop distance 2 in $G$.
-4. Consequently, all 9 nodes in any $3 \times 3$ block pairwise conflict, inducing a complete subgraph (clique) of size 9 in the conflict graph $G^2$: $\omega(G^2) \ge 9$.
-5. By graph coloring fundamentals, the chromatic number is bounded below by the clique number:
-   $$\chi(G^2) \ge \omega(G^2) = 9$$
-Therefore, any schedule with fewer than 9 slots mathematically violates either a Distance-1 (direct collision) or Distance-2 (hidden terminal) invariant. Our independent BFS verifier confirms that **9 unique slots** is the true conflict-free global optimum.
+```text
+================================================================
+ TDMA TOPOLOGY OPTIMIZATION REPORT
+================================================================
+Total Nodes Processed : 16
+Configured Radio Range : 500.0 meters
+Optimized Frame Length : 9 unique timeslots (Lower is better)
+-----------------------------------------------------------------
+NODE -> SLOT ASSIGNMENTS:
+ Node_01: Slot 8
+ Node_02: Slot 4
+ Node_03: Slot 5
+ Node_04: Slot 8
+ Node_05: Slot 6
+ Node_06: Slot 0
+ Node_07: Slot 1
+ Node_08: Slot 6
+ Node_09: Slot 7
+ Node_10: Slot 2
+ Node_11: Slot 3
+ Node_12: Slot 7
+ Node_13: Slot 8
+ Node_14: Slot 4
+ Node_15: Slot 5
+ Node_16: Slot 8
 
----
-
-## 5. Independent Verification Methodology
-
-To prevent algorithmic circularity, the test verification engine (`src/tdma/verify.py`) does **not** import or reuse any graph coloring code, conflict graph logic, or $G^2$ power routines.
-
-### Verification Algorithm
-```python
-def verify_schedule(G_physical, schedule):
-    # 1. Coverage Check: V(G) == keys(schedule)
-    # 2. Contiguity Check: values(schedule) == {0, 1, ..., K-1}
-    # 3. BFS Shortest Path Calculation on G_physical:
-    for u, v in pairs(V):
-        if schedule[u] == schedule[v]:
-            h = shortest_path_length_BFS(G_physical, u, v)
-            assert h >= 3, f"Collision: {u} and {v} share slot at hop distance {h}"
+STRUCTURAL TDMA SCHEDULE MATRIX (Slot x Node Boolean Matrix):
+Slot \ Node | 01 | 02 | 03 | 04 | 05 | 06 | 07 | 08 | 09 | 10 | 11 | 12 | 13 | 14 | 15 | 16
+-----------------------------------------------------------------------------------------------
+Slot 00    |  0 |  0 |  0 |  0 |  0 |  1 |  0 |  0 |  0 |  0 |  0 |  0 |  0 |  0 |  0 |  0
+Slot 01    |  0 |  0 |  0 |  0 |  0 |  0 |  1 |  0 |  0 |  0 |  0 |  0 |  0 |  0 |  0 |  0
+Slot 02    |  0 |  0 |  0 |  0 |  0 |  0 |  0 |  0 |  0 |  1 |  0 |  0 |  0 |  0 |  0 |  0
+Slot 03    |  0 |  0 |  0 |  0 |  0 |  0 |  0 |  0 |  0 |  0 |  1 |  0 |  0 |  0 |  0 |  0
+Slot 04    |  0 |  1 |  0 |  0 |  0 |  0 |  0 |  0 |  0 |  0 |  0 |  0 |  0 |  1 |  0 |  0
+Slot 05    |  0 |  0 |  1 |  0 |  0 |  0 |  0 |  0 |  0 |  0 |  0 |  0 |  0 |  0 |  1 |  0
+Slot 06    |  0 |  0 |  0 |  0 |  1 |  0 |  0 |  1 |  0 |  0 |  0 |  0 |  0 |  0 |  0 |  0
+Slot 07    |  0 |  0 |  0 |  0 |  0 |  0 |  0 |  0 |  1 |  0 |  0 |  1 |  0 |  0 |  0 |  0
+Slot 08    |  1 |  0 |  0 |  1 |  0 |  0 |  0 |  0 |  0 |  0 |  0 |  0 |  1 |  0 |  0 |  1
+-----------------------------------------------------------------------------------------------
+Execution finalized cleanly. Schedule verified conflict-free.
+================================================================
 ```
 
-### Verification Safeguards
-1. **Distance-1 Direct Collision Detection:** Explicitly flags any two adjacent nodes sharing a slot.
-2. **Distance-2 Hidden Terminal Detection:** Intersects neighbor sets $\mathcal{N}(u) \cap \mathcal{N}(v)$ to identify the exact intermediate receiver at risk.
-3. **Contiguity Enforcement:** Flags missing slot indices (e.g., using slots 0, 2 without slot 1).
-4. **Coverage Assertion:** Flags unassigned or phantom nodes.
+---
+
+## 5. How I Checked the Answer
+
+I wrote the verifier in `src/tdma/verify.py` as an isolated module. It does not import any graph coloring code or the $G^2$ conflict graph.
+
+### 5.1 Verification Invariants
+
+The verifier takes the physical graph $G$ and the schedule dictionary. It checks three invariants:
+
+1. **Complete Coverage:** Every node in $V$ appears in the schedule.
+2. **Contiguous Indexing:** Slot numbers form a contiguous range $0 \dots K-1$ with no empty gaps.
+3. **Conflict Freedom:** For every pair of nodes $(u, v)$ sharing a slot, the verifier computes the shortest path length in $G$ using Breadth-First Search (BFS). It asserts that $\text{dist}_G(u, v) \ge 3$.
+
+If any two nodes sharing a slot are 1 hop apart, the verifier reports a direct collision. If they are 2 hops apart, it identifies their shared intermediate neighbor and reports a hidden-terminal violation.
+
+A distance of exactly 500.0 m counts as in range (tolerance 1e-9 m).
+
+The verifier checks conflict freedom and structural correctness. It does not prove optimality on its own. Optimality is established by the 9-clique lower bound and certified by the exact solvers. The test suite contains 47 automated tests covering edge cases, property bounds, and round-trip translations. All 47 pass.
 
 ---
 
-## 6. Part 2: EMANE Integration & Emulation Bridge
+## 6. Part 2: EMANE Integration and Emulation Bridge
 
-### 6.1 EMANE Architecture & Modeling Choices
-EMANE (Extendable Mobile Ad-hoc Network Emulator) enforces real-time medium access control via Network Emulation Modules (NEMs). The bridge interfaces with the official `tdmaeventschedulerradiomodel`:
+Part 2 bridges the Python optimizer to the Extendable Mobile Ad-hoc Network Emulator (EMANE).
 
-- **MAC Configuration (`mac-tdmaeventschedule.xml`):**
-  - `slotduration`: `1000` $\mu\text{s}$ (1.0 ms slot length).
-  - `slotoverhead`: `50` $\mu\text{s}$ guard interval accommodating propagation delay across 500 m ($1.67\ \mu\text{s}$) plus transceiver switching time.
-- **PHY Configuration (`phy-universal.xml`):**
-  - `frequency`: `2400000000` Hz (2.4 GHz carrier).
-  - `bandwidth`: `20000000` Hz (20 MHz channel).
-  - `txpower`: `0.0` dBm.
-- **Mapping Strategy:**
-  - Nodes assigned to slot $s$ are flagged as transmitters (`tx="true"`, `nodes="<id>"`).
-  - All other nodes in that slot are placed in receive mode (`rx="*"`).
+```text
+[Python Optimizer] ---> [Schedule JSON] ---> [EMANE Bridge] ---> [Schedule XML] ---> [EMANE Radios]
+(Tested Offline)        (Tested Offline)     (Tested Offline)    (Tested Offline)    (Design Only / Not Run)
+```
 
-### 6.2 Round-Trip Validation
-The bridge module (`emane/bridge/schedule_to_emane.py`) implements a standalone XML validator that parses generated schedule XML and verifies full bi-directional consistency against the schedule matrix without requiring EMANE to be installed.
+### 6.1 What I Tested Offline vs What Was Not Run
 
-### 6.3 Tested vs. Design-Only Scope
-- **Tested Offline:** Automated schedule JSON transformation, NEM integer ID mapping, XML schedule generation, round-trip schema parsing, schedule-to-matrix parity assertion, and Python event script generation. Tested in pytest with 100% pass rate without requiring EMANE.
-- **Design-Only:** Real-time over-the-air RF packet exchange inside the Linux kernel network stack using running EMANE daemons (due to requirement of root/kernel privileges and containerized environment).
+- **Tested offline:** I tested JSON schedule parsing, 1-based NEM identifier mapping, EMANE XML schedule generation, round-trip XML schema validation, and Python event injection script generation. All offline bridge tests pass under pytest without requiring EMANE.
+- **Not run:** I did not run live over-the-air packet emulation inside Linux network namespaces with EMANE daemons. Running live EMANE requires root privileges, Linux kernel virtual interfaces, and a containerized test environment.
 
-| Parameter / Component | Category | Verified Name / Value | Exact Official URL | Quoted Official Documentation | Status |
-| :--- | :--- | :--- | :--- | :--- | :---: |
-| **MAC Model Library** | MAC Plugin | `tdmaeventschedulerradiomodel` | [tdmaradiomodel.xml.in](https://github.com/adjacentlink/emane/blob/master/src/models/mac/tdma/eventscheduler/tdmaradiomodel.xml.in) | `<mac library='tdmaeventschedulerradiomodel'>` | **VERIFIED** |
-| **MAC Parameters vs Structure** | Architecture | Attributes of `<structure>`, not `<mac>` | [tdma-radio-model.txt](https://github.com/adjacentlink/emane-guide/blob/main/guide/tdma-radio-model.txt) | *"The TDMA structure defines: Slot size in microseconds, Slot overhead in microseconds, Number of slots per frame, Number of frames per multiframe, Transceiver bandwidth in Hz"* | **VERIFIED** |
-| **MAC PCR Curve URI** | MAC Parameter | `pcrcurveuri` | [tdmaradiomodel.xml.in](https://github.com/adjacentlink/emane/blob/master/src/models/mac/tdma/eventscheduler/tdmaradiomodel.xml.in) | `<param name="pcrcurveuri" value='file://@datadir@/xml/models/mac/tdmaeventscheduler/tdmabasemodelpcr.xml'/>` | **VERIFIED** |
-| **MAC Queue Controls** | MAC Parameters | `queue.depth`, `queue.aggregationenable`, etc. | [tdmaradiomodel.xml.in](https://github.com/adjacentlink/emane/blob/master/src/models/mac/tdma/eventscheduler/tdmaradiomodel.xml.in) | `<param name='queue.depth' value='255'/><param name='queue.aggregationenable' value='on'/><param name='queue.strictdequeueenable' value='off'/>` | **VERIFIED** |
-| **Schedule XML Root** | XML Schema | `<emane-tdma-schedule>` | [tdmaschedule.xsd](https://github.com/adjacentlink/emane/blob/master/src/python/emane/events/schema/tdmaschedule.xsd) | `<xs:element name='emane-tdma-schedule'>` | **VERIFIED** |
-| **Schedule Structure** | XML Element | `<structure frames='..' slots='..' slotoverhead='..' slotduration='..' bandwidth='..'/>` | [tdmaschedule.xsd](https://github.com/adjacentlink/emane/blob/master/src/python/emane/events/schema/tdmaschedule.xsd) | `<xs:element name="structure" minOccurs='0'><xs:attribute name='slotduration' type='xs:unsignedLong' use='required'/><xs:attribute name='slotoverhead' type='xs:unsignedLong' use='required'/>...` | **VERIFIED** |
-| **Multiframe & Frames** | XML Elements | `<multiframe>` containing `<frame index='..'>` | [tdmaschedule.xsd](https://github.com/adjacentlink/emane/blob/master/src/python/emane/events/schema/tdmaschedule.xsd) | `<xs:element name="multiframe"><xs:complexType><xs:sequence><xs:element name="frame" maxOccurs="unbounded">` | **VERIFIED** |
-| **Slot Allocation & Types** | XML Elements | `<slot index='..' nodes='..'>` with `<tx>`, `<rx>`, `<idle>` | [tdmaschedule.xsd](https://github.com/adjacentlink/emane/blob/master/src/python/emane/events/schema/tdmaschedule.xsd) | `<xs:element name="slot" maxOccurs="unbounded"><xs:attribute name='index' use='required'/><xs:attribute name='nodes' use='required'/><xs:choice minOccurs='0'><xs:element name="tx">...` | **VERIFIED** |
-| **Schedule Injection Tool** | CLI Utility | `emaneevent-tdmaschedule` | [tdma-radio-model.txt](https://github.com/adjacentlink/emane-guide/blob/main/guide/tdma-radio-model.txt) | *"The emaneevent-tdmaschedule script can be used to process a TDMA Schedule XML file... $ emaneevent-tdmaschedule your-desired-schedule.xml -i lo"* | **VERIFIED** |
-| **Python Event Class** | Python Class | `emane.events.TDMAScheduleEvent` | [tdmascheduleevent.py](https://github.com/adjacentlink/emane/blob/master/src/python/emane/events/tdmascheduleevent.py) | `class TDMAScheduleEvent(Event): IDENTIFIER = 105; def structure(self,**kwargs): ... def append(self,frameIndex,slotIndex,**kwargs):` | **VERIFIED** |
-| **Python Event Publisher** | Python Class | `emane.events.EventService` | [eventservice.py](https://github.com/adjacentlink/emane/blob/master/src/python/emane/events/eventservice.py) | `class EventService: def __init__(self,eventchannel,otachannel = None): (self._multicastGroup,self._port,_) = eventchannel; def publish(self,nemId,event):` | **VERIFIED** |
+### 6.2 Official EMANE Verification Log
 
-### 6.4 Radio Propagation & Range Modeling (Design Only / Untested)
-EMANE's TDMA scheduler radio model has no intrinsic knowledge of the discrete 500.0 m communication range constraint. In EMANE, which virtual radios hear each other is determined strictly by node locations and RF pathloss (location/pathloss events) combined with receiver sensitivity and antenna configuration.
+I checked the parameters and XML structures against official Adjacent Link repositories:
+- EMANE source repository: `https://github.com/adjacentlink/emane`
+- EMANE guide repository: `https://github.com/adjacentlink/emane-guide`
 
-To demonstrate spatial reuse in an emulation:
-1. **Node Locations & Pathloss:** The emulation must place virtual radios at the exact coordinates defined in the Python topology input using `emane.events.LocationEvent` (Event ID 100) or by publishing explicit pathloss matrices via `emane.events.PathlossEvent` (Event ID 101).
-2. **Effective Range Calibration:** The physical layer's transmit power (`txpower = 0.0 dBm`), pathloss model (`propagationmodel = freespace` or `2ray`), and Packet Completion Rate curve (`tdmabasemodelpcr.xml`) must be configured so that the received SINR drops below the decoding threshold at distances exceeding approximately 500.0 meters.
-3. **Collision Risk Under Global Visibility:** If the emulation were executed without location/pathloss events or with an uncalibrated propagation model, all 16 virtual radios would hear one another globally across the multicast OTA channel (`224.1.2.8:45703`). Under global visibility, concurrent transmissions scheduled for nodes separated by $\ge 3$ hops (e.g., Node_01 and Node_04 sharing Slot 8 in the 4x4 grid) would collide at the PHY layer, causing packet drops that the graph model proves should not occur.
+| Parameter / Component | Category | Verified Name / Value | Source file & quoted line | Status |
+| :--- | :--- | :--- | :--- | :---: |
+| **MAC Model Library** | MAC Plugin | `tdmaeventschedulerradiomodel` | `tdmaradiomodel.xml.in`: `<mac library='tdmaeventschedulerradiomodel'>` | **VERIFIED** |
+| **MAC vs Structure** | Architecture | `<structure>` holds timing | `tdma-radio-model.txt`: *"The TDMA structure defines: Slot size..., Slot overhead..., slots per frame..."* | **VERIFIED** |
+| **MAC PCR Curve URI** | MAC Param | `pcrcurveuri` | `tdmaradiomodel.xml.in`: `<param name='pcrcurveuri' value='...tdmabasemodelpcr.xml'/>` | **VERIFIED** |
+| **MAC Queue Controls** | MAC Param | `queue.depth`, `queue.aggregationenable` | `tdmaradiomodel.xml.in`: `<param name='queue.depth' value='255'/>` | **VERIFIED** |
+| **Schedule XML Root** | XML Schema | `<emane-tdma-schedule>` | `tdmaschedule.xsd`: `<xs:element name='emane-tdma-schedule'>` | **VERIFIED** |
+| **Structure Element** | XML Element | `<structure frames=.. slots=..>` | `tdmaschedule.xsd`: `<xs:element name='structure' slotduration=.. slotoverhead=..>` | **VERIFIED** |
+| **Multiframe & Frames** | XML Elements | `<multiframe>` containing `<frame>` | `tdmaschedule.xsd`: `<xs:element name='multiframe'> containing <frame>` | **VERIFIED** |
+| **Slot Allocation & Types** | XML Elements | `<slot index=.. nodes=..>` | `tdmaschedule.xsd`: `<xs:element name='slot'> with <tx>, <rx>, <idle>` | **VERIFIED** |
+| **Schedule Injection Tool** | CLI Utility | `emaneevent-tdmaschedule` | `tdma-radio-model.txt`: `$ emaneevent-tdmaschedule schedule.xml -i lo` | **VERIFIED** |
+| **Python Event Class** | Python Class | `emane.events.TDMAScheduleEvent` | `tdmascheduleevent.py`: `class TDMAScheduleEvent; def structure(..); def append(..)` | **VERIFIED** |
+| **Python Event Publisher** | Python Class | `emane.events.EventService` | `eventservice.py`: `class EventService(eventchannel); def publish(nemId, event)` | **VERIFIED** |
+| **MAC Param Schedule** | MAC Param | `<param name='schedule' value='..'/>` | Not found in `tdmaradiomodel.xml.in`; runtime events appear required | **ASSUMPTION** |
 
-*Status: DESIGN ONLY / UNTESTED. Offline XML schedule translation and schema parity are fully tested; live RF propagation tuning and packet-level slot enforcement have not been executed on a live Linux kernel testbed.*
+### 6.3 Radio Propagation and Range Modeling
 
-### 6.5 Bridge Design and Planned Test Plan (Not Yet Run)
-1. **XML Schedule Translation:**
-   Each node's timeslot assignment from the optimizer is mapped into an EMANE `<slot>` entry. Transmitting nodes are tagged with `<tx>` containing their 1-based NEM identifier (`nodes="1,4,13,16"`), while non-transmitting nodes default to receive mode (`<rx>`).
-2. **Schedule Injection:**
-   Schedules are delivered to the radio model as `TDMAScheduleEvent` events via `emaneevent-tdmaschedule` or Python `emane.events.EventService.publish()`. Loading from a MAC `<param>` is an ASSUMPTION, not verified.
-3. **Planned Verification Observations:**
-   - *Valid Schedule:* In a planned emulation run, ping and iperf streams between nodes should observe packet transmissions occurring strictly inside allocated 1.0 ms slots at repeating frame intervals, with expected delivery only in scheduled slots.
-   - *Deliberately Conflicting Schedule:* Forcing two nodes within 2 hops to share a slot should produce simultaneous transmissions that overlap at the shared receiver, resulting in low SINR, PCR curve packet discards, and measurable loss.
-   - *Range Calibration:* Pathloss and antenna parameters should be calibrated so received power beyond ~500 m drops below the receiver sensitivity threshold, demonstrating physical spatial reuse without false collisions.
+EMANE's TDMA scheduler radio model has no built-in 500-meter cutoff. Physical reachability is determined by node positions, RF pathloss events (`PathlossEvent`, Event ID 101), antenna gain, and receiver sensitivity.
+
+If EMANE runs without location or pathloss events, all 16 virtual radios share a single broadcast domain over multicast OTA (`224.1.2.8:45703`). Under global visibility, transmissions from nodes sharing Slot 8 (such as Node_01 and Node_04) would collide at the physical layer. To demonstrate spatial reuse in emulation, pathloss and transmit power must be calibrated so received signal strength drops below detection threshold beyond 500 meters.
+
+### 6.4 Planned Test Plan (Not Yet Run)
+
+1. **Valid schedule test:** Transmit ping and iperf packets across all pairs. Verify that packet delivery occurs strictly inside allocated 1.0 ms slots at 9 ms frame intervals, with expected delivery only in scheduled slots.
+2. **Conflicting schedule test:** Intentionally assign two 2-hop neighbors to the same slot. Verify that simultaneous transmissions cause collision, low SINR, and packet drops at the intermediate receiver.
+3. **Range calibration test:** Tune the pathloss model so communication drops off at approximately 500 meters, verifying spatial reuse without false collisions.
 
 ---
 
-## 7. Assumptions & Edge-Case Handling
+## 7. Things I Am Unsure About
 
-1. **Boundary Condition (500.0 m):**
-   Distances are computed using double-precision Euclidean distance:
-   $$d = \sqrt{(x_1 - x_2)^2 + (y_1 - y_2)^2}$$
-   An edge is established if $d \le 500.0 + 10^{-9}\text{ m}$. Exactly 500.0 m is strictly treated as in-range.
-2. **Physical Co-location (Duplicate Coordinates):**
-   Placing two distinct radio identifiers at identical coordinates $(x, y)$ is a physical anomaly that causes singular topologies. The parser detects duplicate coordinates and terminates immediately with an explicit error message and non-zero exit code.
-3. **Contiguous Compaction:**
-   Whenever pruning or heuristics leave gaps in slot numbering, the compaction engine relabels active colors into the contiguous interval $[0, K-1]$.
-4. **Arbitrary Node Counts ($n \ge 1$):**
-   The pipeline gracefully supports single-node topologies (producing 1 slot, 0 edges) and arbitrary node counts.
+I identified two areas where information is incomplete:
+
+1. **Schedule loading via MAC parameter:** The official `tdmaradiomodel.xml.in` manifest does not list a `schedule` parameter. Official guides inject schedules dynamically using `emaneevent-tdmaschedule` or the `TDMAScheduleEvent` API. Loading a schedule statically from a MAC parameter remains an unverified assumption.
+2. **The brief's 5-slot sample:** The assignment brief showed a sample output with 5 slots, but did not provide coordinates. On a 4x4 grid with 300 m spacing and 500 m radio range, 5 slots is mathematically impossible due to the 9-clique lower bound. If 5 slots was intended, either the radio range was lower (excluding diagonals) or the topology was linear or sparse. I treated the brief's sample as an illustrative format example rather than a fixed target. The independent verifier checks physical correctness.
 
 ---
 
-## 8. Future Roadmap
+## 8. Next Steps
 
-1. **Multi-Channel TDMA (Time-Frequency Grid):**
-   Expand the coloring dimension to 2D lattices $(t, f)$ where nodes may select across orthogonal frequency channels, reducing frame length.
-2. **Dynamic Mobile TDMA (MANET):**
-   Implement distributed reservation protocols (e.g., DRAND / C-TDMA) with periodic schedule re-convergence for moving nodes.
-3. **Directed Link Scheduling (STDMA):**
-   Transition from omnidirectional broadcast reservation to directed link-based slot scheduling, allowing simultaneous transmission to distinct non-interfering receivers.
+If I continue work on this project, I will:
+
+1. **Execute live EMANE on a Linux testbed:** Set up Linux network namespaces and run EMANE daemons in a Docker container to measure real packet latency and throughput.
+2. **Calibrate propagation models:** Tune freespace or two-ray pathloss parameters to produce the 500-meter cutoff in live emulation.
+3. **Multi-channel TDMA:** Extend the optimizer to allocate both time slots and frequency channels $(t, f)$, reducing frame length in dense networks.
+4. **Dynamic mobile scheduling:** Adapt the scheduler for moving nodes using incremental coloring and distributed slot reservations.
