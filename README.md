@@ -24,7 +24,7 @@ python -m tdma.cli --coords-file examples/grid_4x4_300m.json
 python -m pytest -q
 ```
 
-The editable install (`pip install -e .`) registers the package so the CLI and test suite resolve imports cleanly. The test suite runs 47 tests and passes in under 3 seconds.
+The editable install (`pip install -e .`) registers the package so the CLI and test suite resolve imports cleanly. The test suite runs 47 tests and takes a few seconds.
 
 ## Usage
 
@@ -41,7 +41,7 @@ The editable install (`pip install -e .`) registers the package so the CLI and t
 
 Inline coordinate input:
 ```bash
-python -m tdma.cli --coords '{"A": [0, 0], "B": [300, 0], "C": [600, 0]}'
+python -m tdma.cli --coords '{\"A\": [0, 0], \"B\": [300, 0], \"C\": [600, 0]}'
 ```
 
 Output on the 4x4 grid example:
@@ -70,7 +70,7 @@ Execution finalized cleanly. Schedule verified conflict-free.
 
 ## How It Works
 
-The optimizer models physical connectivity as a unit-disk graph G where radios within 500 m share an edge. It squares G to produce conflict graph G², where an edge connects any pair separated by 1 or 2 hops. Standard vertex colouring on G² directly solves distance-2 colouring: direct neighbours and hidden terminals receive different slots, while pairs 3 or more hops apart can reuse the same slot. Five heuristics (Welsh-Powell, DSATUR, Smallest-Last, 1000 random restarts, and Kempe-swap local search) solve topologies in under a millisecond. An exact CP-SAT solver (with pure Python branch-and-bound fallback) computes the global optimum. Before output, an independent BFS-based verifier checks distance-1 and distance-2 constraints. See [docs/design.pdf](docs/design.pdf) for mathematical proofs and benchmark analysis.
+The optimizer models physical connectivity as a unit-disk graph G where radios within 500 m share an edge. It squares G to produce conflict graph G², where an edge connects any pair separated by 1 or 2 hops. Standard vertex colouring on G² directly solves distance-2 colouring: direct neighbours and hidden terminals receive different slots, while pairs 3 or more hops apart can reuse the same slot. The three greedy heuristics take well under a millisecond on 16 nodes; 1000 random restarts and local search take tens of milliseconds. An exact CP-SAT solver (with pure Python branch-and-bound fallback) computes the global optimum. Before output, an independent BFS-based verifier checks distance-1 and distance-2 constraints. See [docs/design.pdf](docs/design.pdf) for mathematical proofs and benchmark analysis.
 
 ## Repository Layout
 
@@ -84,7 +84,7 @@ tdma-schedule-optimizer/
   tests/              # 47 unit, property, and bridge test cases
   examples/           # Sample topology JSON files and verified grid schedule
   emane/              # EMANE emulation configs, Dockerfile, and translation bridge
-  docs/               # Design report PDF, slide deck PPTX, and design notes
+  docs/               # Design report PDF and slide deck PPTX
   tools/              # Scripts to regenerate design.pdf and presentation.pptx
 ```
 
