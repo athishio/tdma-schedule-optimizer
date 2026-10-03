@@ -71,7 +71,7 @@ During design, I considered several alternative optimization approaches:
 
 - **Genetic Algorithms:** I rejected genetic algorithms because their stochastic search provides no guarantee of optimality. Furthermore, distance-2 graph coloring has strict hard constraints, and random crossover or mutation operators frequently produce invalid schedules that require expensive repair routines.
 - **Simulated Annealing:** I rejected simulated annealing because penalty tuning on soft conflict formulations is fragile. It often converges to near-valid states with residual collisions, requiring an auxiliary deterministic coloring pass.
-- **Plain ILP without Symmetry Breaking:** A naive ILP formulation assigns colors $0 \dots K-1$. Because any permutation of slot assignments is equivalent, the solver explores thousands of symmetric branches. Anchoring a maximum clique upfront breaks this symmetry and allows CP-SAT to solve the 4x4 grid in under 1 millisecond.
+- **Plain ILP without Symmetry Breaking:** A naive ILP formulation assigns colors $0 \dots K-1$. Because any permutation of slot assignments is equivalent, colour permutations create many equivalent branches. Anchoring a maximum clique upfront removes that symmetry.
 
 ### 3.4 Summary of Design Decisions
 
@@ -88,9 +88,9 @@ I tested the optimizer across four representative topologies. Every topology mat
 
 ### 4.1 Topology Summary
 
-| Topology Scenario | Nodes ($|V|$) | $G$ Edges | $G^2$ Edges | Max Deg $\Delta(G^2)$ | Exact Optimum ($\chi$) | Best Heuristic | Gap | Exact Runtime |
+| Topology Scenario | Nodes ($|V|$) | $G$ Edges | $G^2$ Edges | Max Deg $\Delta(G^2)$ | Exact Optimum ($\chi$) | Best Heuristic | Gap | Exact solver runtime (one run) |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **1. 4x4 Grid (300 m spacing)** | 16 | 42 | 90 | 15 | **9 slots** | **9 slots** | 0 | 0.48 ms |
+| **1. 4x4 Grid (300 m spacing)** | 16 | 42 | 90 | 15 | **9 slots** | **9 slots** | 0 | 0.57 ms |
 | **2. Sparse Linear (350 m spacing)** | 16 | 15 | 29 | 4 | **3 slots** | **3 slots** | 0 | 0.17 ms |
 | **3. Dense Cluster ($d \le 500$ m)** | 16 | 120 | 120 | 15 | **16 slots** | **16 slots** | 0 | 0.22 ms |
 | **4. Disconnected Clusters** | 16 | 56 | 56 | 7 | **8 slots** | **8 slots** | 0 | 0.30 ms |
@@ -215,7 +215,7 @@ I checked the parameters and XML structures against official Adjacent Link repos
 
 EMANE's TDMA scheduler radio model has no built-in 500-meter cutoff. Physical reachability is determined by node positions, RF pathloss events (`PathlossEvent`, Event ID 101), antenna gain, and receiver sensitivity.
 
-If EMANE runs without location or pathloss events, all 16 virtual radios share a single broadcast domain over multicast OTA (`224.1.2.8:45703`). Under global visibility, transmissions from nodes sharing Slot 8 (such as Node_01 and Node_04) would collide at the physical layer. To demonstrate spatial reuse in emulation, pathloss and transmit power must be calibrated so received signal strength drops below detection threshold beyond 500 meters.
+If EMANE runs without location or pathloss events, all 16 virtual radios would hear each other. Under global visibility, transmissions from nodes sharing Slot 8 (such as Node_01 and Node_04) would collide at the physical layer. To demonstrate spatial reuse in emulation, pathloss and transmit power must be calibrated so received signal strength drops below detection threshold beyond 500 meters.
 
 ### 6.4 Planned Test Plan (Not Yet Run)
 

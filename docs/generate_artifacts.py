@@ -303,7 +303,7 @@ def build_pdf(filename: str):
         "During design, I considered several alternative optimization approaches:<br/>"
         "• <b>Genetic Algorithms:</b> I rejected genetic algorithms because their stochastic search provides no guarantee of optimality. Furthermore, distance-2 graph coloring has strict hard constraints, and random crossover or mutation operators frequently produce invalid schedules that require expensive repair routines.<br/>"
         "• <b>Simulated Annealing:</b> I rejected simulated annealing because penalty tuning on soft conflict formulations is fragile. It often converges to near-valid states with residual collisions, requiring an auxiliary deterministic coloring pass.<br/>"
-        "• <b>Plain ILP without Symmetry Breaking:</b> A naive ILP formulation assigns colors <i>0 ... K-1</i>. Because any permutation of slot assignments is equivalent, the solver explores thousands of symmetric branches. Anchoring a maximum clique upfront breaks this symmetry and allows CP-SAT to solve the 4x4 grid in under 1 millisecond.",
+        "• <b>Plain ILP without Symmetry Breaking:</b> A naive ILP formulation assigns colors <i>0 ... K-1</i>. Because any permutation of slot assignments is equivalent, colour permutations create many equivalent branches. Anchoring a maximum clique upfront removes that symmetry.",
         body_style
     ))
 
@@ -337,7 +337,7 @@ def build_pdf(filename: str):
             Paragraph("Exact Opt", table_cell_header),
             Paragraph("Best Heur", table_cell_header),
             Paragraph("Gap", table_cell_header),
-            Paragraph("Runtime", table_cell_header),
+            Paragraph("Exact solver runtime (one run)", table_cell_header),
         ],
         [
             Paragraph("1. 4x4 Grid (300 m)", table_cell),
@@ -348,7 +348,7 @@ def build_pdf(filename: str):
             Paragraph("<b>9 slots</b>", table_cell_bold),
             Paragraph("<b>9 slots</b>", table_cell_bold),
             Paragraph("0", table_cell),
-            Paragraph("0.48 ms", table_cell),
+            Paragraph("0.57 ms", table_cell),
         ],
         [
             Paragraph("2. Sparse Linear (350 m)", table_cell),
@@ -384,7 +384,7 @@ def build_pdf(filename: str):
             Paragraph("0.30 ms", table_cell),
         ],
     ]
-    t = Table(table_data, colWidths=[1.7 * inch, 0.5 * inch, 0.55 * inch, 0.6 * inch, 0.55 * inch, 0.65 * inch, 0.65 * inch, 0.5 * inch, 0.65 * inch])
+    t = Table(table_data, colWidths=[1.60 * inch, 0.55 * inch, 0.55 * inch, 0.60 * inch, 0.55 * inch, 0.65 * inch, 0.65 * inch, 0.40 * inch, 1.30 * inch])
     t.setStyle(
         TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(NAVY)),
@@ -546,7 +546,7 @@ def build_pdf(filename: str):
     story.append(Paragraph("6.3 Radio Propagation and Range Modeling in EMANE", h2_style))
     story.append(Paragraph(
         "EMANE's TDMA scheduler radio model has no built-in 500-meter cutoff. Physical reachability is determined by node positions, RF pathloss events (<code>PathlossEvent</code>, Event ID 101), antenna gain, and receiver sensitivity.<br/>"
-        "If EMANE runs without location or pathloss events, all 16 virtual radios share a single broadcast domain over multicast OTA (<code>224.1.2.8:45703</code>). "
+        "If EMANE runs without location or pathloss events, all 16 virtual radios would hear each other. "
         "Under global visibility, transmissions from nodes sharing Slot 8 (such as Node_01 and Node_04) would collide at the physical layer. "
         "To demonstrate spatial reuse in emulation, pathloss and transmit power must be calibrated so received signal strength drops below detection threshold beyond 500 meters.",
         body_style

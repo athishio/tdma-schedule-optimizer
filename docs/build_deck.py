@@ -21,10 +21,11 @@ from pathlib import Path
 from pptx import Presentation
 from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
-from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
+from pptx.enum.text import PP_ALIGN, MSO_ANCHOR, MSO_AUTO_SIZE
 from pptx.enum.shapes import MSO_SHAPE, MSO_CONNECTOR
 from pptx.chart.data import CategoryChartData
 from pptx.enum.chart import XL_CHART_TYPE, XL_LEGEND_POSITION
+from pptx.oxml import parse_xml
 
 # -----------------------------------------------------------------------------
 # Color Palette
@@ -257,11 +258,11 @@ def create_deck(output_path="docs/presentation.pptx"):
     p.font.color.rgb = COLOR_INK
 
     # Full-width native diagram scaled up: A -> B <- C
-    node_dia2 = Inches(1.35)
-    dia_y = Inches(3.40)
+    node_dia2 = Inches(1.55)
+    dia_y = Inches(3.25)
     pos_a = Inches(1.80)
-    pos_b = Inches(5.99)
-    pos_c = Inches(10.18)
+    pos_b = Inches(5.89)
+    pos_c = Inches(9.98)
 
     # Solid connector lines: A -> B and C -> B
     arr_ab = s2.shapes.add_connector(MSO_CONNECTOR.STRAIGHT, pos_a + node_dia2, dia_y + node_dia2 // 2, pos_b, dia_y + node_dia2 // 2)
@@ -273,7 +274,7 @@ def create_deck(output_path="docs/presentation.pptx"):
     arr_cb.line.width = Pt(3.5)
 
     # Link distance labels above arrows
-    d_ab = s2.shapes.add_textbox(pos_a + Inches(1.45), dia_y - Inches(0.45), Inches(2.2), Inches(0.40))
+    d_ab = s2.shapes.add_textbox(pos_a + Inches(1.65), dia_y - Inches(0.50), Inches(2.2), Inches(0.40))
     d_ab_p = d_ab.text_frame.paragraphs[0]
     d_ab_p.text = "d \u2264 500 m"
     d_ab_p.font.name = FONT_BODY
@@ -282,7 +283,7 @@ def create_deck(output_path="docs/presentation.pptx"):
     d_ab_p.font.color.rgb = COLOR_TEAL
     d_ab_p.alignment = PP_ALIGN.CENTER
 
-    d_cb = s2.shapes.add_textbox(pos_b + Inches(1.45), dia_y - Inches(0.45), Inches(2.2), Inches(0.40))
+    d_cb = s2.shapes.add_textbox(pos_b + Inches(1.65), dia_y - Inches(0.50), Inches(2.2), Inches(0.40))
     d_cb_p = d_cb.text_frame.paragraphs[0]
     d_cb_p.text = "d \u2264 500 m"
     d_cb_p.font.name = FONT_BODY
@@ -292,11 +293,11 @@ def create_deck(output_path="docs/presentation.pptx"):
     d_cb_p.alignment = PP_ALIGN.CENTER
 
     # Dashed line across top: out of range
-    dash_ac = s2.shapes.add_connector(MSO_CONNECTOR.STRAIGHT, pos_a + node_dia2 // 2, dia_y - Inches(0.80), pos_c + node_dia2 // 2, dia_y - Inches(0.80))
+    dash_ac = s2.shapes.add_connector(MSO_CONNECTOR.STRAIGHT, pos_a + node_dia2 // 2, dia_y - Inches(0.85), pos_c + node_dia2 // 2, dia_y - Inches(0.85))
     dash_ac.line.color.rgb = COLOR_AMBER
     dash_ac.line.width = Pt(2.5)
 
-    ac_lbl = s2.shapes.add_textbox(pos_b - Inches(1.5), Inches(2.05), Inches(4.5), Inches(0.45))
+    ac_lbl = s2.shapes.add_textbox(pos_b - Inches(1.5), dia_y - Inches(1.35), Inches(4.5), Inches(0.45))
     ac_lbl_p = ac_lbl.text_frame.paragraphs[0]
     ac_lbl_p.text = "out of range (d > 500 m)"
     ac_lbl_p.font.name = FONT_BODY
@@ -322,12 +323,12 @@ def create_deck(output_path="docs/presentation.pptx"):
         p = tf.paragraphs[0]
         p.text = lbl
         p.font.name = FONT_TITLE
-        p.font.size = Pt(30)
+        p.font.size = Pt(32)
         p.font.bold = True
         p.font.color.rgb = COLOR_WHITE
         p.alignment = PP_ALIGN.CENTER
 
-        sub = s2.shapes.add_textbox(nx - Inches(1.0), dia_y + node_dia2 + Inches(0.20), node_dia2 + Inches(2.0), Inches(0.55))
+        sub = s2.shapes.add_textbox(nx - Inches(1.2), dia_y + node_dia2 + Inches(0.25), node_dia2 + Inches(2.4), Inches(0.60))
         stf = sub.text_frame
         stf.word_wrap = True
         stf.margin_left = stf.margin_top = stf.margin_right = stf.margin_bottom = 0
@@ -378,11 +379,11 @@ def create_deck(output_path="docs/presentation.pptx"):
     p.font.color.rgb = COLOR_INK
 
     # Diagrams of a 5-node line scaled up by ~1.3x
-    nd_dia3 = Inches(0.85)
-    line_y = Inches(4.10)
+    nd_dia3 = Inches(0.95)
+    line_y = Inches(3.85)
 
     # Left diagram: Physical Graph G
-    g_title = s3.shapes.add_textbox(Inches(0.6), Inches(2.30), Inches(4.5), Inches(0.45))
+    g_title = s3.shapes.add_textbox(Inches(0.55), Inches(2.15), Inches(4.5), Inches(0.45))
     gt_p = g_title.text_frame.paragraphs[0]
     gt_p.text = "Physical graph G"
     gt_p.font.name = FONT_TITLE
@@ -390,12 +391,12 @@ def create_deck(output_path="docs/presentation.pptx"):
     gt_p.font.bold = True
     gt_p.font.color.rgb = COLOR_INK
 
-    left_nodes = [Inches(0.6) + i * Inches(0.95) for i in range(5)]
+    left_nodes = [Inches(0.55) + i * Inches(0.95) for i in range(5)]
     # Direct 1-hop links
     for i in range(4):
         ln = s3.shapes.add_connector(MSO_CONNECTOR.STRAIGHT, left_nodes[i] + nd_dia3, line_y + nd_dia3 // 2, left_nodes[i+1], line_y + nd_dia3 // 2)
         ln.line.color.rgb = COLOR_TEAL
-        ln.line.width = Pt(3)
+        ln.line.width = Pt(3.5)
 
     for i, nx in enumerate(left_nodes):
         circ = s3.shapes.add_shape(MSO_SHAPE.OVAL, nx, line_y, nd_dia3, nd_dia3)
@@ -407,20 +408,20 @@ def create_deck(output_path="docs/presentation.pptx"):
         p = tf.paragraphs[0]
         p.text = str(i + 1)
         p.font.name = FONT_TITLE
-        p.font.size = Pt(20)
+        p.font.size = Pt(22)
         p.font.bold = True
         p.font.color.rgb = COLOR_WHITE
         p.alignment = PP_ALIGN.CENTER
 
-    g_sub = s3.shapes.add_textbox(Inches(0.6), line_y + nd_dia3 + Inches(0.18), Inches(4.5), Inches(0.45))
+    g_sub = s3.shapes.add_textbox(Inches(0.55), line_y + nd_dia3 + Inches(0.20), Inches(4.5), Inches(0.45))
     g_sub_p = g_sub.text_frame.paragraphs[0]
     g_sub_p.text = "Edges where distance \u2264 500 m"
     g_sub_p.font.name = FONT_BODY
-    g_sub_p.font.size = Pt(18)
+    g_sub_p.font.size = Pt(19)
     g_sub_p.font.color.rgb = COLOR_MUTED
 
-    # Center transition label on ONE single line (width 2.65 in)
-    trans = s3.shapes.add_textbox(Inches(5.25), Inches(4.25), Inches(2.65), Inches(0.50))
+    # Center transition label on ONE single line (width 2.60 in)
+    trans = s3.shapes.add_textbox(Inches(5.40), Inches(4.10), Inches(2.60), Inches(0.50))
     trans_tf = trans.text_frame
     trans_tf.word_wrap = False
     trans_tf.margin_left = trans_tf.margin_top = trans_tf.margin_right = trans_tf.margin_bottom = 0
@@ -433,7 +434,7 @@ def create_deck(output_path="docs/presentation.pptx"):
     tp.alignment = PP_ALIGN.CENTER
 
     # Right diagram: Conflict Graph G^2
-    g2_title = s3.shapes.add_textbox(Inches(8.0), Inches(2.30), Inches(4.5), Inches(0.45))
+    g2_title = s3.shapes.add_textbox(Inches(8.10), Inches(2.15), Inches(4.5), Inches(0.45))
     g2t_p = g2_title.text_frame.paragraphs[0]
     g2t_p.text = "Conflict graph G\u00B2"
     g2t_p.font.name = FONT_TITLE
@@ -441,28 +442,28 @@ def create_deck(output_path="docs/presentation.pptx"):
     g2t_p.font.bold = True
     g2t_p.font.color.rgb = COLOR_INK
 
-    right_nodes = [Inches(8.0) + i * Inches(0.95) for i in range(5)]
+    right_nodes = [Inches(8.10) + i * Inches(0.95) for i in range(5)]
     # Direct 1-hop links
     for i in range(4):
         ln = s3.shapes.add_connector(MSO_CONNECTOR.STRAIGHT, right_nodes[i] + nd_dia3, line_y + nd_dia3 // 2, right_nodes[i+1], line_y + nd_dia3 // 2)
         ln.line.color.rgb = COLOR_TEAL
-        ln.line.width = Pt(3)
+        ln.line.width = Pt(3.5)
 
     # Added 2-hop links across top with distinct bridges connecting to nodes
-    hop2_pairs = [(0, 2, Inches(0.45)), (1, 3, Inches(0.80)), (2, 4, Inches(0.45))]
+    hop2_pairs = [(0, 2, Inches(0.55)), (1, 3, Inches(0.95)), (2, 4, Inches(0.55))]
     for src, dst, arc_offset in hop2_pairs:
         x1 = right_nodes[src] + nd_dia3 // 2
         x2 = right_nodes[dst] + nd_dia3 // 2
         y_top = line_y - arc_offset
         ln_up = s3.shapes.add_connector(MSO_CONNECTOR.STRAIGHT, x1, line_y, x1, y_top)
         ln_up.line.color.rgb = COLOR_AMBER
-        ln_up.line.width = Pt(2)
+        ln_up.line.width = Pt(2.5)
         ln_bar = s3.shapes.add_connector(MSO_CONNECTOR.STRAIGHT, x1, y_top, x2, y_top)
         ln_bar.line.color.rgb = COLOR_AMBER
-        ln_bar.line.width = Pt(2)
+        ln_bar.line.width = Pt(2.5)
         ln_down = s3.shapes.add_connector(MSO_CONNECTOR.STRAIGHT, x2, y_top, x2, line_y)
         ln_down.line.color.rgb = COLOR_AMBER
-        ln_down.line.width = Pt(2)
+        ln_down.line.width = Pt(2.5)
 
     for i, nx in enumerate(right_nodes):
         circ = s3.shapes.add_shape(MSO_SHAPE.OVAL, nx, line_y, nd_dia3, nd_dia3)
@@ -474,20 +475,20 @@ def create_deck(output_path="docs/presentation.pptx"):
         p = tf.paragraphs[0]
         p.text = str(i + 1)
         p.font.name = FONT_TITLE
-        p.font.size = Pt(20)
+        p.font.size = Pt(22)
         p.font.bold = True
         p.font.color.rgb = COLOR_WHITE
         p.alignment = PP_ALIGN.CENTER
 
-    g2_sub = s3.shapes.add_textbox(Inches(8.0), line_y + nd_dia3 + Inches(0.18), Inches(4.5), Inches(0.45))
+    g2_sub = s3.shapes.add_textbox(Inches(8.10), line_y + nd_dia3 + Inches(0.20), Inches(4.5), Inches(0.45))
     g2_sub_p = g2_sub.text_frame.paragraphs[0]
     g2_sub_p.text = "1-hop and 2-hop neighbors become adjacent"
     g2_sub_p.font.name = FONT_BODY
-    g2_sub_p.font.size = Pt(18)
+    g2_sub_p.font.size = Pt(19)
     g2_sub_p.font.color.rgb = COLOR_MUTED
 
     # Bottom takeaway sentence
-    b3_box = s3.shapes.add_textbox(Inches(1.0), Inches(6.05), Inches(11.333), Inches(0.55))
+    b3_box = s3.shapes.add_textbox(Inches(1.0), Inches(5.95), Inches(11.333), Inches(0.55))
     b3_tf = b3_box.text_frame
     b3_tf.word_wrap = True
     b3_tf.margin_left = b3_tf.margin_top = b3_tf.margin_right = b3_tf.margin_bottom = 0
@@ -516,7 +517,7 @@ def create_deck(output_path="docs/presentation.pptx"):
     tbl4_x = Inches(1.0)
     tbl4_y = Inches(1.65)
     tbl4_w = Inches(11.333)
-    tbl4_h = Inches(4.20)
+    tbl4_h = Inches(4.55)
 
     t4_shape = s4.shapes.add_table(7, 3, tbl4_x, tbl4_y, tbl4_w, tbl4_h)
     t4 = t4_shape.table
@@ -543,18 +544,18 @@ def create_deck(output_path="docs/presentation.pptx"):
             p.alignment = PP_ALIGN.LEFT if c_idx == 0 else PP_ALIGN.CENTER
             if r_idx == 0:
                 p.font.name = FONT_TITLE
-                p.font.size = Pt(20)
+                p.font.size = Pt(21)
                 p.font.bold = True
                 p.font.color.rgb = COLOR_INK
             else:
                 p.font.name = FONT_BODY
-                p.font.size = Pt(18)
+                p.font.size = Pt(19)
                 p.font.color.rgb = COLOR_INK
                 if c_idx == 1:
                     p.font.bold = True
 
     # One line under table
-    u_box = s4.shapes.add_textbox(Inches(1.0), Inches(6.15), Inches(11.333), Inches(0.55))
+    u_box = s4.shapes.add_textbox(Inches(1.0), Inches(6.40), Inches(11.333), Inches(0.45))
     utf = u_box.text_frame
     utf.word_wrap = True
     utf.margin_left = utf.margin_top = utf.margin_right = utf.margin_bottom = 0
@@ -594,6 +595,7 @@ def create_deck(output_path="docs/presentation.pptx"):
 
     term_box = s5.shapes.add_textbox(panel_x + Inches(0.18), panel_y + Inches(0.08), panel_w - Inches(0.36), panel_h - Inches(0.16))
     ttf5 = term_box.text_frame
+    ttf5.auto_size = MSO_AUTO_SIZE.NONE
     ttf5.word_wrap = False
     ttf5.margin_left = ttf5.margin_top = ttf5.margin_right = ttf5.margin_bottom = 0
 
@@ -965,11 +967,11 @@ def create_deck(output_path="docs/presentation.pptx"):
         ("EMANE", "not run", COLOR_AMBER),
     ]
 
-    box_w = Inches(2.05)
-    box_h = Inches(1.10)
-    gap_p = Inches(0.40)
-    pipe_x0 = Inches(0.70)
-    pipe_y0 = Inches(1.90)
+    box_w = Inches(2.15)
+    box_h = Inches(1.30)
+    gap_p = Inches(0.35)
+    pipe_x0 = Inches(0.60)
+    pipe_y0 = Inches(1.80)
 
     for idx, (b_name, b_status, b_col) in enumerate(steps):
         bx = pipe_x0 + idx * (box_w + gap_p)
@@ -979,7 +981,7 @@ def create_deck(output_path="docs/presentation.pptx"):
             prev_rx = bx - gap_p
             arrow = s8.shapes.add_connector(MSO_CONNECTOR.STRAIGHT, prev_rx, pipe_y0 + box_h // 2, bx, pipe_y0 + box_h // 2)
             arrow.line.color.rgb = COLOR_TEAL if idx < 4 else COLOR_AMBER
-            arrow.line.width = Pt(2.5)
+            arrow.line.width = Pt(3)
 
         # Box
         b_shape = s8.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, bx, pipe_y0, box_w, box_h)
@@ -992,26 +994,26 @@ def create_deck(output_path="docs/presentation.pptx"):
         p = tf.paragraphs[0]
         p.text = b_name
         p.font.name = FONT_BODY
-        p.font.size = Pt(22)
+        p.font.size = Pt(24)
         p.font.bold = True
         p.font.color.rgb = COLOR_WHITE
         p.alignment = PP_ALIGN.CENTER
 
         # Status label under box
-        lbl = s8.shapes.add_textbox(bx - Inches(0.20), pipe_y0 + box_h + Inches(0.15), box_w + Inches(0.40), Inches(0.45))
+        lbl = s8.shapes.add_textbox(bx - Inches(0.15), pipe_y0 + box_h + Inches(0.18), box_w + Inches(0.30), Inches(0.45))
         stf = lbl.text_frame
         stf.word_wrap = False
         stf.margin_left = stf.margin_top = stf.margin_right = stf.margin_bottom = 0
         lp = stf.paragraphs[0]
         lp.text = b_status
         lp.font.name = FONT_BODY
-        lp.font.size = Pt(18)
+        lp.font.size = Pt(19)
         lp.font.bold = True
         lp.font.color.rgb = b_col
         lp.alignment = PP_ALIGN.CENTER
 
     # Three plain lines
-    lines8_box = s8.shapes.add_textbox(Inches(0.80), Inches(4.15), Inches(11.5), Inches(2.40))
+    lines8_box = s8.shapes.add_textbox(Inches(0.80), Inches(4.25), Inches(11.5), Inches(2.40))
     l8tf = lines8_box.text_frame
     l8tf.word_wrap = True
     l8tf.margin_left = l8tf.margin_top = l8tf.margin_right = l8tf.margin_bottom = 0
@@ -1025,10 +1027,10 @@ def create_deck(output_path="docs/presentation.pptx"):
         p = l8tf.paragraphs[0] if idx == 0 else l8tf.add_paragraph()
         p.text = l8
         p.font.name = FONT_BODY
-        p.font.size = Pt(20)
+        p.font.size = Pt(21)
         p.font.color.rgb = COLOR_INK
         if idx > 0:
-            p.space_before = Pt(14)
+            p.space_before = Pt(20)
 
     s8.notes_slide.notes_text_frame.text = (
         "For Part 2, the goal was connecting the optimizer to EMANE's TDMA radio model. "
@@ -1046,24 +1048,33 @@ def create_deck(output_path="docs/presentation.pptx"):
         """Ensure zero drop shadows on any shape, table, connector, or text box."""
         for slide in presentation.slides:
             for shape in slide.shapes:
+                # 1. Remove <p:style> element completely so shapes don't inherit theme effects
                 try:
-                    spPr = shape._element.spPr
-                    effectLst = spPr.find('{http://schemas.openxmlformats.org/drawingml/2006/main}effectLst')
-                    if effectLst is not None:
-                        spPr.remove(effectLst)
+                    style = shape._element.find('{http://schemas.openxmlformats.org/presentationml/2006/main}style')
+                    if style is not None:
+                        shape._element.remove(style)
                 except Exception:
                     pass
+
+                # 2. Add or reset empty <a:effectLst/> in spPr
                 try:
-                    if hasattr(shape, "shadow") and shape.shadow is not None:
-                        shape.shadow.inherit = False
+                    spPr = getattr(shape._element, 'spPr', None)
+                    if spPr is not None:
+                        effectLst = spPr.find('{http://schemas.openxmlformats.org/drawingml/2006/main}effectLst')
+                        if effectLst is not None:
+                            spPr.remove(effectLst)
+                        spPr.append(parse_xml('<a:effectLst xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"/>'))
                 except Exception:
                     pass
+
+                # 3. Handle tables
                 if shape.has_table:
                     try:
                         tblPr = shape.table._tbl.tblPr
                         effectLst = tblPr.find('{http://schemas.openxmlformats.org/drawingml/2006/main}effectLst')
                         if effectLst is not None:
                             tblPr.remove(effectLst)
+                        tblPr.append(parse_xml('<a:effectLst xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"/>'))
                     except Exception:
                         pass
 
