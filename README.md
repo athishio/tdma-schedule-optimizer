@@ -40,9 +40,18 @@ The editable install (`pip install -e .`) registers the package so the CLI and t
 | `--force-pure-python-exact` | Force pure Python exact backtracking solver instead of OR-Tools |
 
 Inline coordinate input:
+
+Bash, Git Bash, Linux, macOS:
 ```bash
+python -m tdma.cli --coords '{"A": [0, 0], "B": [300, 0], "C": [600, 0]}'
+```
+
+Windows PowerShell (double quotes must be escaped):
+```powershell
 python -m tdma.cli --coords '{\"A\": [0, 0], \"B\": [300, 0], \"C\": [600, 0]}'
 ```
+
+On Windows, using `--coords-file` avoids shell quoting problems entirely.
 
 Output on the 4x4 grid example:
 ```
