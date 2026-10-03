@@ -1,6 +1,6 @@
 """
-docs/build_deck.py
-Redesigned from scratch to be publication-quality, editorial, and human-designed.
+tools/build_deck.py
+Redesigned to be publication-quality, editorial, and human-designed.
 Adheres strictly to all user design rules:
 - Paper background (#F6F3EC), Ink text (#1B1F2A), single accent per slide (#D97706 or #0F766E).
 - Text directly on the canvas with generous whitespace and a single thin hairline rule under the title.
@@ -44,7 +44,13 @@ FONT_BODY  = "Calibri"
 FONT_CODE  = "Consolas"
 
 
-def create_deck(output_path="docs/presentation.pptx"):
+REPO_ROOT = Path(__file__).resolve().parent.parent
+DEFAULT_DECK_PATH = str(REPO_ROOT / "docs" / "presentation.pptx")
+
+
+def create_deck(output_path=None):
+    if output_path is None:
+        output_path = DEFAULT_DECK_PATH
     prs = Presentation()
     prs.slide_width = Inches(13.333)
     prs.slide_height = Inches(7.500)
@@ -109,14 +115,14 @@ def create_deck(output_path="docs/presentation.pptx"):
         return slide
 
     # Verify real schedule before drawing any slide
-    grid_schedule_file = Path("examples/grid_schedule.json")
+    grid_schedule_file = REPO_ROOT / "examples" / "grid_schedule.json"
     if not grid_schedule_file.exists():
         raise FileNotFoundError(f"Missing schedule file: {grid_schedule_file}")
 
     with open(grid_schedule_file, "r") as f:
         grid_data = json.load(f)
 
-    sys.path.insert(0, str(Path("src").resolve()))
+    sys.path.insert(0, str((REPO_ROOT / "src").resolve()))
     from tdma.verify import verify_schedule
     from tdma.graph import build_connectivity_graph, parse_coordinates
 
@@ -1126,5 +1132,5 @@ def create_deck(output_path="docs/presentation.pptx"):
 
 
 if __name__ == "__main__":
-    out_file = sys.argv[1] if len(sys.argv) > 1 else "docs/presentation.pptx"
+    out_file = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_DECK_PATH
     create_deck(out_file)

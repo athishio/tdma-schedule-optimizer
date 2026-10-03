@@ -1,6 +1,6 @@
 """
 Generate docs/design.pdf (8-section design notes, 6-8 pages)
-and docs/presentation.pptx (via build_deck.py).
+and docs/presentation.pptx (via tools/build_deck.py).
 """
 
 from __future__ import annotations
@@ -37,6 +37,10 @@ from reportlab.pdfgen import canvas
 
 from tdma.graph import parse_coordinates, build_connectivity_graph
 from tdma.verify import verify_schedule
+
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DEFAULT_PDF_PATH = os.path.join(REPO_ROOT, "docs", "design.pdf")
+DEFAULT_PPTX_PATH = os.path.join(REPO_ROOT, "docs", "presentation.pptx")
 
 # ---------------------------------------------------------------------------
 # Colors
@@ -714,7 +718,7 @@ def build_pdf(filename: str):
 
 def _generate_grid_graph_image(path: str):
     """Draw 4x4 grid colored by the verified 9-slot schedule from examples/grid_schedule.json."""
-    schedule_file = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "examples", "grid_schedule.json")
+    schedule_file = os.path.join(REPO_ROOT, "examples", "grid_schedule.json")
     with open(schedule_file, "r", encoding="utf-8") as f:
         data = json.load(f)
 
@@ -919,15 +923,15 @@ def _generate_architecture_diagram(path: str):
 def build_pptx(filename: str):
     import sys
     from pathlib import Path
-    docs_dir = Path(__file__).resolve().parent
-    if str(docs_dir) not in sys.path:
-        sys.path.insert(0, str(docs_dir))
+    tools_dir = Path(__file__).resolve().parent
+    if str(tools_dir) not in sys.path:
+        sys.path.insert(0, str(tools_dir))
     from build_deck import create_deck
     create_deck(filename)
 
 
 if __name__ == "__main__":
-    pdf_path = os.path.join(os.path.dirname(__file__), "design.pdf")
-    pptx_path = os.path.join(os.path.dirname(__file__), "presentation.pptx")
+    pdf_path = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_PDF_PATH
+    pptx_path = sys.argv[2] if len(sys.argv) > 2 else DEFAULT_PPTX_PATH
     build_pdf(pdf_path)
     build_pptx(pptx_path)
