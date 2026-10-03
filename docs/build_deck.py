@@ -378,12 +378,15 @@ def create_deck(output_path="docs/presentation.pptx"):
     p.font.size = Pt(20)
     p.font.color.rgb = COLOR_INK
 
-    # Diagrams of a 5-node line scaled up by ~1.3x
-    nd_dia3 = Inches(0.95)
-    line_y = Inches(3.85)
+    # Parameters for 5-node line diagrams
+    nd_dia3 = Inches(0.80)   # Shrink circles to about 0.8 in
+    gap_x   = Inches(0.50)   # At least 0.5 in visible gap between neighbours
+    step_x  = nd_dia3 + gap_x # 1.30 in
+    line_y  = Inches(3.95)
 
     # Left diagram: Physical Graph G
-    g_title = s3.shapes.add_textbox(Inches(0.55), Inches(2.15), Inches(4.5), Inches(0.45))
+    g_x0 = Inches(0.55)
+    g_title = s3.shapes.add_textbox(g_x0, Inches(2.15), Inches(4.5), Inches(0.45))
     gt_p = g_title.text_frame.paragraphs[0]
     gt_p.text = "Physical graph G"
     gt_p.font.name = FONT_TITLE
@@ -391,10 +394,16 @@ def create_deck(output_path="docs/presentation.pptx"):
     gt_p.font.bold = True
     gt_p.font.color.rgb = COLOR_INK
 
-    left_nodes = [Inches(0.55) + i * Inches(0.95) for i in range(5)]
-    # Direct 1-hop links
+    left_nodes = [g_x0 + i * step_x for i in range(5)]
+    # Direct 1-hop links drawn underneath circles
     for i in range(4):
-        ln = s3.shapes.add_connector(MSO_CONNECTOR.STRAIGHT, left_nodes[i] + nd_dia3, line_y + nd_dia3 // 2, left_nodes[i+1], line_y + nd_dia3 // 2)
+        ln = s3.shapes.add_connector(
+            MSO_CONNECTOR.STRAIGHT,
+            left_nodes[i] + nd_dia3 // 2,
+            line_y + nd_dia3 // 2,
+            left_nodes[i+1] + nd_dia3 // 2,
+            line_y + nd_dia3 // 2
+        )
         ln.line.color.rgb = COLOR_TEAL
         ln.line.width = Pt(3.5)
 
@@ -408,33 +417,34 @@ def create_deck(output_path="docs/presentation.pptx"):
         p = tf.paragraphs[0]
         p.text = str(i + 1)
         p.font.name = FONT_TITLE
-        p.font.size = Pt(22)
+        p.font.size = Pt(20)
         p.font.bold = True
         p.font.color.rgb = COLOR_WHITE
         p.alignment = PP_ALIGN.CENTER
 
-    g_sub = s3.shapes.add_textbox(Inches(0.55), line_y + nd_dia3 + Inches(0.20), Inches(4.5), Inches(0.45))
+    g_sub = s3.shapes.add_textbox(g_x0, line_y + nd_dia3 + Inches(0.25), Inches(5.5), Inches(0.45))
     g_sub_p = g_sub.text_frame.paragraphs[0]
     g_sub_p.text = "Edges where distance \u2264 500 m"
     g_sub_p.font.name = FONT_BODY
     g_sub_p.font.size = Pt(19)
     g_sub_p.font.color.rgb = COLOR_MUTED
 
-    # Center transition label on ONE single line (width 2.60 in)
-    trans = s3.shapes.add_textbox(Inches(5.40), Inches(4.10), Inches(2.60), Inches(0.50))
+    # Center transition label on ONE single line (width 3.60 in)
+    trans = s3.shapes.add_textbox(Inches(4.85), Inches(2.65), Inches(3.60), Inches(0.50))
     trans_tf = trans.text_frame
     trans_tf.word_wrap = False
     trans_tf.margin_left = trans_tf.margin_top = trans_tf.margin_right = trans_tf.margin_bottom = 0
     tp = trans_tf.paragraphs[0]
     tp.text = "\u2192 Square it \u2192 G\u00B2"
     tp.font.name = FONT_TITLE
-    tp.font.size = Pt(20)
+    tp.font.size = Pt(22)
     tp.font.bold = True
     tp.font.color.rgb = COLOR_AMBER
     tp.alignment = PP_ALIGN.CENTER
 
     # Right diagram: Conflict Graph G^2
-    g2_title = s3.shapes.add_textbox(Inches(8.10), Inches(2.15), Inches(4.5), Inches(0.45))
+    g2_x0 = Inches(6.75)
+    g2_title = s3.shapes.add_textbox(g2_x0, Inches(2.15), Inches(4.5), Inches(0.45))
     g2t_p = g2_title.text_frame.paragraphs[0]
     g2t_p.text = "Conflict graph G\u00B2"
     g2t_p.font.name = FONT_TITLE
@@ -442,10 +452,16 @@ def create_deck(output_path="docs/presentation.pptx"):
     g2t_p.font.bold = True
     g2t_p.font.color.rgb = COLOR_INK
 
-    right_nodes = [Inches(8.10) + i * Inches(0.95) for i in range(5)]
-    # Direct 1-hop links
+    right_nodes = [g2_x0 + i * step_x for i in range(5)]
+    # Direct 1-hop links drawn underneath circles
     for i in range(4):
-        ln = s3.shapes.add_connector(MSO_CONNECTOR.STRAIGHT, right_nodes[i] + nd_dia3, line_y + nd_dia3 // 2, right_nodes[i+1], line_y + nd_dia3 // 2)
+        ln = s3.shapes.add_connector(
+            MSO_CONNECTOR.STRAIGHT,
+            right_nodes[i] + nd_dia3 // 2,
+            line_y + nd_dia3 // 2,
+            right_nodes[i+1] + nd_dia3 // 2,
+            line_y + nd_dia3 // 2
+        )
         ln.line.color.rgb = COLOR_TEAL
         ln.line.width = Pt(3.5)
 
@@ -475,12 +491,12 @@ def create_deck(output_path="docs/presentation.pptx"):
         p = tf.paragraphs[0]
         p.text = str(i + 1)
         p.font.name = FONT_TITLE
-        p.font.size = Pt(22)
+        p.font.size = Pt(20)
         p.font.bold = True
         p.font.color.rgb = COLOR_WHITE
         p.alignment = PP_ALIGN.CENTER
 
-    g2_sub = s3.shapes.add_textbox(Inches(8.10), line_y + nd_dia3 + Inches(0.20), Inches(4.5), Inches(0.45))
+    g2_sub = s3.shapes.add_textbox(g2_x0, line_y + nd_dia3 + Inches(0.25), Inches(5.5), Inches(0.45))
     g2_sub_p = g2_sub.text_frame.paragraphs[0]
     g2_sub_p.text = "1-hop and 2-hop neighbors become adjacent"
     g2_sub_p.font.name = FONT_BODY
@@ -517,7 +533,7 @@ def create_deck(output_path="docs/presentation.pptx"):
     tbl4_x = Inches(1.0)
     tbl4_y = Inches(1.65)
     tbl4_w = Inches(11.333)
-    tbl4_h = Inches(4.55)
+    tbl4_h = Inches(4.20)
 
     t4_shape = s4.shapes.add_table(7, 3, tbl4_x, tbl4_y, tbl4_w, tbl4_h)
     t4 = t4_shape.table
@@ -544,18 +560,18 @@ def create_deck(output_path="docs/presentation.pptx"):
             p.alignment = PP_ALIGN.LEFT if c_idx == 0 else PP_ALIGN.CENTER
             if r_idx == 0:
                 p.font.name = FONT_TITLE
-                p.font.size = Pt(21)
+                p.font.size = Pt(20)
                 p.font.bold = True
                 p.font.color.rgb = COLOR_INK
             else:
                 p.font.name = FONT_BODY
-                p.font.size = Pt(19)
+                p.font.size = Pt(18)
                 p.font.color.rgb = COLOR_INK
                 if c_idx == 1:
                     p.font.bold = True
 
-    # One line under table
-    u_box = s4.shapes.add_textbox(Inches(1.0), Inches(6.40), Inches(11.333), Inches(0.45))
+    # One line under table with clear gap (>= 0.35 in; 6.30 - 5.85 = 0.45 in gap)
+    u_box = s4.shapes.add_textbox(Inches(1.0), Inches(6.30), Inches(11.333), Inches(0.45))
     utf = u_box.text_frame
     utf.word_wrap = True
     utf.margin_left = utf.margin_top = utf.margin_right = utf.margin_bottom = 0
