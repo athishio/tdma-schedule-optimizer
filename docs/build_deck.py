@@ -527,11 +527,11 @@ def create_deck(output_path="docs/presentation.pptx"):
     t4_rows = [
         ("Method", "Slots on 4×4 grid", "Time"),
         ("Greedy by degree (Welsh-Powell)", "9", "0.06 ms"),
-        ("DSATUR (Saturation greedy)", "9", "0.15 ms"),
-        ("Smallest-last (Degeneracy order)", "9", "0.20 ms"),
-        ("1000 random restarts", "9", "24.2 ms"),
-        ("Local search with Kempe swaps", "9", "60.8 ms"),
-        ("Exact solver (CP-SAT)", "9", "0.60 ms"),
+        ("DSATUR (Saturation greedy)", "9", "0.16 ms"),
+        ("Smallest-last (Degeneracy order)", "9", "0.12 ms"),
+        ("1000 random restarts", "9", "26.3 ms"),
+        ("Local search with Kempe swaps", "9", "60.2 ms"),
+        ("Exact solver (CP-SAT)", "9", "0.57 ms"),
     ]
 
     for r_idx, row in enumerate(t4_rows):
@@ -567,13 +567,13 @@ def create_deck(output_path="docs/presentation.pptx"):
     s4.notes_slide.notes_text_frame.text = (
         "I wanted to evaluate several coloring algorithms to see which one gave the tightest schedule. "
         "I started with greedy coloring ordered by degree, which took 0.06 milliseconds and found 9 slots. "
-        "Then I tried DSATUR, which dynamically chooses the node with the most colored neighbors; that also took under a millisecond "
-        "and found 9 slots. Smallest-last ordering based on graph degeneracy gave the same 9 slots. "
+        "Then I tried DSATUR, which dynamically chooses the node with the most colored neighbors; that took 0.16 milliseconds "
+        "and found 9 slots. Smallest-last ordering based on graph degeneracy took 0.12 milliseconds and gave the same 9 slots. "
         "To test whether random orders could shake loose an 8-slot schedule, I ran 1000 seeded random restarts; "
-        "that took 24 milliseconds, but the best schedule remained 9 slots. Finally, I built a local search routine with Kempe-chain swaps "
-        "and tabu search to try to eliminate the ninth color; after 2000 swaps it still couldn't reach 8. "
+        "that took 26.3 milliseconds, but the best schedule remained 9 slots. Finally, I built a local search routine with Kempe-chain swaps "
+        "and tabu search to try to eliminate the ninth color; after 60.2 milliseconds it still couldn't reach 8. "
         "Because all five heuristics stalled at 9, I couldn't tell if 9 was an algorithmic limitation or a physical lower bound. "
-        "That's why I added an exact solver using Google OR-Tools CP-SAT with maximum-clique pre-coloring."
+        "That's why I added an exact solver using Google OR-Tools CP-SAT with maximum-clique pre-coloring, solving in 0.57 milliseconds."
     )
 
     # =========================================================================
@@ -582,9 +582,9 @@ def create_deck(output_path="docs/presentation.pptx"):
     s5 = add_page("The result on the 4x4 grid")
 
     panel_x = Inches(0.70)
-    panel_y = Inches(1.45)
-    panel_w = Inches(6.50)
-    panel_h = Inches(5.25)
+    panel_y = Inches(1.40)
+    panel_w = Inches(6.55)
+    panel_h = Inches(5.35)
 
     # Dark background terminal rectangle matching grid diagram height
     t_bg = s5.shapes.add_shape(MSO_SHAPE.RECTANGLE, panel_x, panel_y, panel_w, panel_h)
@@ -592,7 +592,7 @@ def create_deck(output_path="docs/presentation.pptx"):
     t_bg.fill.fore_color.rgb = RGBColor(26, 31, 44)
     t_bg.line.fill.background()
 
-    term_box = s5.shapes.add_textbox(panel_x + Inches(0.18), panel_y + Inches(0.10), panel_w - Inches(0.36), panel_h - Inches(0.20))
+    term_box = s5.shapes.add_textbox(panel_x + Inches(0.18), panel_y + Inches(0.08), panel_w - Inches(0.36), panel_h - Inches(0.16))
     ttf5 = term_box.text_frame
     ttf5.word_wrap = False
     ttf5.margin_left = ttf5.margin_top = ttf5.margin_right = ttf5.margin_bottom = 0
@@ -633,7 +633,7 @@ def create_deck(output_path="docs/presentation.pptx"):
 
     # Right: 4x4 Grid diagram coloured by slot, four corners ringed in amber
     grid_x0 = Inches(7.60)
-    grid_y0 = Inches(1.45)
+    grid_y0 = Inches(1.40)
     g_gap   = Inches(1.25)
     g_dia   = Inches(0.70)
 
@@ -743,7 +743,7 @@ def create_deck(output_path="docs/presentation.pptx"):
     sp6.font.color.rgb = COLOR_INK
 
     # 3 short lines
-    lines_box = s6.shapes.add_textbox(left_x6, Inches(3.90), Inches(5.8), Inches(1.55))
+    lines_box = s6.shapes.add_textbox(left_x6, Inches(3.80), Inches(5.8), Inches(1.15))
     ltf = lines_box.text_frame
     ltf.word_wrap = True
     ltf.margin_left = ltf.margin_top = ltf.margin_right = ltf.margin_bottom = 0
@@ -760,20 +760,20 @@ def create_deck(output_path="docs/presentation.pptx"):
         p.font.size = Pt(20)
         p.font.color.rgb = COLOR_INK
         if idx > 0:
-            p.space_before = Pt(6)
+            p.space_before = Pt(4)
 
-    # Small amber note below bullets
+    # Small amber note below bullets - clear gap of 5.65 - 4.95 = 0.70 in (>= 0.3 in)
     note_box = s6.shapes.add_textbox(left_x6, Inches(5.65), Inches(5.8), Inches(1.10))
     ntf6 = note_box.text_frame
     ntf6.word_wrap = True
     ntf6.margin_left = ntf6.margin_top = ntf6.margin_right = ntf6.margin_bottom = 0
     np6 = ntf6.paragraphs[0]
     np6.text = (
-        "The brief's sample shows 5 slots. Node_01 and Node_03 are 600 m apart, "
-        "but Node_02 hears both, so distance-2 forbids sharing."
+        "The brief's sample shows 5 slots with partial coordinates. "
+        "Node_01 and Node_03 share slot 0, but both neighbor Node_02, so distance-2 forbids sharing."
     )
     np6.font.name = FONT_BODY
-    np6.font.size = Pt(20)
+    np6.font.size = Pt(19)
     np6.font.color.rgb = COLOR_AMBER
 
     # Right: 4x4 Grid diagram with 3x3 block highlighted
@@ -1041,6 +1041,33 @@ def create_deck(output_path="docs/presentation.pptx"):
         "Looking ahead, the next steps are running that container with live virtual interfaces, "
         "extending to 2D time-frequency coloring, and handling dynamic mobile topologies."
     )
+
+    def strip_all_shadows(presentation):
+        """Ensure zero drop shadows on any shape, table, connector, or text box."""
+        for slide in presentation.slides:
+            for shape in slide.shapes:
+                try:
+                    spPr = shape._element.spPr
+                    effectLst = spPr.find('{http://schemas.openxmlformats.org/drawingml/2006/main}effectLst')
+                    if effectLst is not None:
+                        spPr.remove(effectLst)
+                except Exception:
+                    pass
+                try:
+                    if hasattr(shape, "shadow") and shape.shadow is not None:
+                        shape.shadow.inherit = False
+                except Exception:
+                    pass
+                if shape.has_table:
+                    try:
+                        tblPr = shape.table._tbl.tblPr
+                        effectLst = tblPr.find('{http://schemas.openxmlformats.org/drawingml/2006/main}effectLst')
+                        if effectLst is not None:
+                            tblPr.remove(effectLst)
+                    except Exception:
+                        pass
+
+    strip_all_shadows(prs)
 
     # Save presentation
     prs.save(output_path)

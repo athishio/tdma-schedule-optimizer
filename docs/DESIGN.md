@@ -11,7 +11,7 @@
 
 I built this optimizer to solve broadcast scheduling for radio nodes on a shared 2.4 GHz wireless channel. When nodes share a radio channel, uncontrolled transmissions cause packet collisions. Time Division Multiple Access (TDMA) fixes this by breaking time into repeating frames of fixed timeslots. Each node gets one or more slots to transmit.
 
-The network sits on a 2D plane with an omnidirectional radio range of 500.0 meters. A valid schedule must handle two collision types:
+The network sits on a 2D plane with an omnidirectional radio range of 500.0 meters. A valid schedule must handle two collision types and one reuse rule:
 
 1. **Distance-1 collision:** Two nodes within 500 meters cannot transmit in the same slot. If they transmit together, each radio drowns out the other and neither can receive.
 2. **Distance-2 collision (the hidden-terminal problem):** Two nodes might be more than 500 meters apart, but share a common neighbor within 500 meters of both. If both transmit at the same time, the neighbor hears overlapping signals and receives garbage.
@@ -35,7 +35,7 @@ $$1 \le \text{dist}_G(u, v) \le 2$$
 
 With this construction, a valid TDMA schedule is equivalent to a proper vertex colouring of $G^2$. Two nodes that share an edge in $G^2$ conflict and must receive different colors (slots). Two nodes with no edge in $G^2$ are at least 3 hops apart and can safely share a slot.
 
-Vertex colouring on arbitrary graphs is NP-hard. Even for unit-disk graphs, distance-2 colouring remains NP-hard. I use two graph properties to bound the required slots:
+Minimum colouring is NP-hard in general. I use two graph properties to bound the required slots:
 
 - **Lower bound:** The maximum clique size $\omega(G^2)$. If a group of nodes all pairwise conflict within 2 hops, every node in that group needs a distinct slot.
 - **Upper bound:** The maximum vertex degree $\Delta(G^2) + 1$, achievable by greedy colouring.
@@ -51,10 +51,10 @@ I implemented five heuristic algorithms to find schedules quickly, and two exact
 I evaluated all five heuristics on the 4x4 grid topology (16 nodes, 300 m spacing, 500 m range):
 
 1. **Largest-Degree-First (LDF / Welsh-Powell):** Sorts nodes descending by degree in $G^2$ and colors greedily. It assigned 9 slots in 0.06 ms. It was the fastest heuristic.
-2. **DSATUR (Brélaz):** Selects the uncolored vertex with the highest number of distinct colors among its neighbors. It assigned 9 slots in 0.25 ms.
-3. **Smallest-Last (Matula and Beck):** Repeatedly removes the minimum-degree vertex from the remaining subgraph, then colors in reverse order. It assigned 9 slots in 0.09 ms.
-4. **Randomized Restarts:** Evaluates 1000 seeded random vertex permutations with greedy first-fit. It consistently found 9 slots in 60.8 ms.
-5. **Local Search (Color Reduction):** Starts from the best greedy schedule and attempts to eliminate the highest slot using Kempe-chain swaps and tabu search. On the 4x4 grid, it attempted to reduce 9 slots to 8, but correctly stopped because 8 slots is mathematically impossible.
+2. **DSATUR (Brélaz):** Selects the uncolored vertex with the highest number of distinct colors among its neighbors. It assigned 9 slots in 0.16 ms.
+3. **Smallest-Last (Matula and Beck):** Repeatedly removes the minimum-degree vertex from the remaining subgraph, then colors in reverse order. It assigned 9 slots in 0.12 ms.
+4. **Randomized Restarts:** Evaluates 1000 seeded random vertex permutations with greedy first-fit. It consistently found 9 slots in 26.3 ms.
+5. **Local Search (Color Reduction):** Starts from the best greedy schedule and attempts to eliminate the highest slot using Kempe-chain swaps and tabu search. It completed in 60.2 ms; on the 4x4 grid, it attempted to reduce 9 slots to 8, but correctly stopped because 8 slots is mathematically impossible.
 
 All five heuristics matched the theoretical minimum of 9 slots on the 4x4 grid. LDF proved to be the fastest option.
 
@@ -62,7 +62,7 @@ All five heuristics matched the theoretical minimum of 9 slots on the 4x4 grid. 
 
 Heuristics cannot prove optimality on their own. I added two exact solvers to certify the true minimum frame length:
 
-1. **Google OR-Tools CP-SAT:** Formulates the problem as constraint optimization with binary assignment variables $x_{v,c}$ and slot indicators $y_c$. I broke color permutation symmetry by pre-colouring a maximum clique in $G^2$. It solved the 4x4 grid in 0.60 ms, confirming that 9 slots is the exact optimum.
+1. **Google OR-Tools CP-SAT:** Formulates the problem as constraint optimization with binary assignment variables $x_{v,c}$ and slot indicators $y_c$. I broke color permutation symmetry by pre-colouring a maximum clique in $G^2$. It solved the 4x4 grid in 0.57 ms, confirming that 9 slots is the exact optimum.
 2. **Pure-Python Branch-and-Bound Fallback:** A zero-dependency backtracking solver. It uses clique pre-colouring, lower-bound pruning, and DSATUR variable ordering. It serves as a standalone fallback when OR-Tools is not installed.
 
 ### 3.3 What I Considered but Rejected
@@ -72,6 +72,13 @@ During design, I considered several alternative optimization approaches:
 - **Genetic Algorithms:** I rejected genetic algorithms because their stochastic search provides no guarantee of optimality. Furthermore, distance-2 graph coloring has strict hard constraints, and random crossover or mutation operators frequently produce invalid schedules that require expensive repair routines.
 - **Simulated Annealing:** I rejected simulated annealing because penalty tuning on soft conflict formulations is fragile. It often converges to near-valid states with residual collisions, requiring an auxiliary deterministic coloring pass.
 - **Plain ILP without Symmetry Breaking:** A naive ILP formulation assigns colors $0 \dots K-1$. Because any permutation of slot assignments is equivalent, the solver explores thousands of symmetric branches. Anchoring a maximum clique upfront breaks this symmetry and allows CP-SAT to solve the 4x4 grid in under 1 millisecond.
+
+### 3.4 Summary of Design Decisions
+
+- **Why graph squaring?** Squaring isolates distance constraints into edge adjacency. Standard graph coloring routines can then run unmodified.
+- **Why five heuristics?** On these four topologies all five heuristics tied, so their differences would only show on larger or irregular networks, which I did not test.
+- **Why an exact solver?** Exact methods certify whether heuristic schedules reached the mathematical floor.
+- **Why a separate verifier?** A separate verifier independently evaluates physical invariants using BFS on $G$.
 
 ---
 
@@ -223,7 +230,7 @@ If EMANE runs without location or pathloss events, all 16 virtual radios share a
 I identified two areas where information is incomplete:
 
 1. **Schedule loading via MAC parameter:** The official `tdmaradiomodel.xml.in` manifest does not list a `schedule` parameter. Official guides inject schedules dynamically using `emaneevent-tdmaschedule` or the `TDMAScheduleEvent` API. Loading a schedule statically from a MAC parameter remains an unverified assumption.
-2. **The brief's 5-slot sample:** The assignment brief showed a sample output with 5 slots, but did not provide coordinates. On a 4x4 grid with 300 m spacing and 500 m radio range, 5 slots is mathematically impossible due to the 9-clique lower bound. If 5 slots was intended, either the radio range was lower (excluding diagonals) or the topology was linear or sparse. I treated the brief's sample as an illustrative format example rather than a fixed target. The independent verifier checks physical correctness.
+2. **The brief's 5-slot sample:** The brief gave partial coordinates (Node_01 at [0, 0], Node_02 at [300, 0], and Node_16 at [900, 900]), consistent with a 4x4 grid at 300 m. However, the sample report showed 5 slots. For the 4x4 grid at 300 m, 5 slots is mathematically impossible because of the 9-clique lower bound. Furthermore, in the sample schedule Node_01 and Node_03 share slot 0 although both are neighbours of Node_02, which the distance-2 rule forbids. I treated the brief's sample as a format example rather than a physical target. The independent verifier checks physical correctness.
 
 ---
 

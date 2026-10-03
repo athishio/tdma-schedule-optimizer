@@ -39,5 +39,6 @@ htmlcov/
 
 # Project output artifacts
 output/
+scratch/
 *.png
 schedule_export.json

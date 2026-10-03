@@ -226,7 +226,7 @@ def build_pdf(filename: str):
     ))
     story.append(Paragraph(
         "The network sits on a 2D plane with an omnidirectional radio range of 500.0 meters. "
-        "A valid schedule must handle two collision types:",
+        "A valid schedule must handle two collision types and one reuse rule:",
         body_style
     ))
     story.append(Paragraph("• <b>Distance-1 collision:</b> Two nodes within 500 meters cannot transmit in the same slot. If they transmit together, each radio drowns out the other and neither can receive.", bullet_style))
@@ -262,7 +262,7 @@ def build_pdf(filename: str):
         body_style
     ))
     story.append(Paragraph(
-        "Vertex colouring on arbitrary graphs is NP-hard. Even for unit-disk graphs, distance-2 colouring remains NP-hard. "
+        "Minimum colouring is NP-hard in general. "
         "I use two graph properties to bound the required slots:<br/>"
         "• <b>Lower bound:</b> The maximum clique size <i>&omega;(G<sup>2</sup>)</i>. If a group of nodes all pairwise conflict within 2 hops, every node in that group needs a distinct slot.<br/>"
         "• <b>Upper bound:</b> The maximum vertex degree <i>&Delta;(G<sup>2</sup>) + 1</i>, achievable by greedy colouring.",
@@ -282,10 +282,10 @@ def build_pdf(filename: str):
     story.append(Paragraph(
         "I evaluated all five heuristics on the 4x4 grid topology (16 nodes, 300 m spacing, 500 m range):<br/>"
         "1. <b>Largest-Degree-First (LDF / Welsh-Powell):</b> Sorts nodes descending by degree in <i>G<sup>2</sup></i> and colors greedily. It assigned 9 slots in 0.06 ms. It was the fastest heuristic.<br/>"
-        "2. <b>DSATUR (Brélaz):</b> Selects the uncolored vertex with the highest number of distinct colors among its neighbors. It assigned 9 slots in 0.25 ms.<br/>"
-        "3. <b>Smallest-Last (Matula and Beck):</b> Repeatedly removes the minimum-degree vertex from the remaining subgraph, then colors in reverse order. It assigned 9 slots in 0.09 ms.<br/>"
-        "4. <b>Randomized Restarts:</b> Evaluates 1000 seeded random vertex permutations with greedy first-fit. It consistently found 9 slots in 60.8 ms.<br/>"
-        "5. <b>Local Search (Color Reduction):</b> Starts from the best greedy schedule and attempts to eliminate the highest slot using Kempe-chain swaps and tabu search. On the 4x4 grid, it attempted to reduce 9 slots to 8, but correctly stopped because 8 slots is mathematically impossible.<br/>"
+        "2. <b>DSATUR (Brélaz):</b> Selects the uncolored vertex with the highest number of distinct colors among its neighbors. It assigned 9 slots in 0.16 ms.<br/>"
+        "3. <b>Smallest-Last (Matula and Beck):</b> Repeatedly removes the minimum-degree vertex from the remaining subgraph, then colors in reverse order. It assigned 9 slots in 0.12 ms.<br/>"
+        "4. <b>Randomized Restarts:</b> Evaluates 1000 seeded random vertex permutations with greedy first-fit. It consistently found 9 slots in 26.3 ms.<br/>"
+        "5. <b>Local Search (Color Reduction):</b> Starts from the best greedy schedule and attempts to eliminate the highest slot using Kempe-chain swaps and tabu search. It completed in 60.2 ms; on the 4x4 grid, it attempted to reduce 9 slots to 8, but correctly stopped because 8 slots is mathematically impossible.<br/>"
         "All five heuristics matched the theoretical minimum of 9 slots on the 4x4 grid. LDF proved to be the fastest option.",
         body_style
     ))
@@ -293,7 +293,7 @@ def build_pdf(filename: str):
     story.append(Paragraph("3.2 Two Exact Solvers", h2_style))
     story.append(Paragraph(
         "Heuristics cannot prove optimality on their own. I added two exact solvers to certify the true minimum frame length:<br/>"
-        "1. <b>Google OR-Tools CP-SAT:</b> Formulates the problem as constraint optimization with binary assignment variables <i>x<sub>v,c</sub></i> and slot indicators <i>y<sub>c</sub></i>. I broke color permutation symmetry by pre-colouring a maximum clique in <i>G<sup>2</sup></i>. It solved the 4x4 grid in 0.60 ms, confirming that 9 slots is the exact optimum.<br/>"
+        "1. <b>Google OR-Tools CP-SAT:</b> Formulates the problem as constraint optimization with binary assignment variables <i>x<sub>v,c</sub></i> and slot indicators <i>y<sub>c</sub></i>. I broke color permutation symmetry by pre-colouring a maximum clique in <i>G<sup>2</sup></i>. It solved the 4x4 grid in 0.57 ms, confirming that 9 slots is the exact optimum.<br/>"
         "2. <b>Pure-Python Branch-and-Bound Fallback:</b> A zero-dependency backtracking solver. It uses clique pre-colouring, lower-bound pruning, and DSATUR variable ordering. It serves as a standalone fallback when OR-Tools is not installed.",
         body_style
     ))
@@ -310,7 +310,7 @@ def build_pdf(filename: str):
     story.append(Paragraph("3.4 Summary of Design Decisions", h2_style))
     story.append(Paragraph(
         "<b>Why graph squaring?</b> Squaring isolates distance constraints into edge adjacency. Standard graph coloring routines can then run unmodified.<br/>"
-        "<b>Why five heuristics?</b> They offer distinct trade-offs between execution speed and search depth across irregular topologies.<br/>"
+        "<b>Why five heuristics?</b> On these four topologies all five heuristics tied, so their differences would only show on larger or irregular networks, which I did not test.<br/>"
         "<b>Why an exact solver?</b> Exact methods certify whether heuristic schedules reached the mathematical floor.<br/>"
         "<b>Why a separate verifier?</b> A separate verifier independently evaluates physical invariants using BFS on <i>G</i>.",
         body_style
@@ -689,7 +689,7 @@ def build_pdf(filename: str):
     story.append(Paragraph(
         "I identified two areas where information is incomplete:<br/>"
         "1. <b>Schedule loading via MAC parameter:</b> The official <code>tdmaradiomodel.xml.in</code> manifest does not list a <code>schedule</code> parameter. Official guides inject schedules dynamically using <code>emaneevent-tdmaschedule</code> or the <code>TDMAScheduleEvent</code> API. Loading a schedule statically from a MAC parameter remains an unverified assumption.<br/>"
-        "2. <b>The brief's 5-slot sample:</b> The assignment brief showed a sample output with 5 slots, but did not provide coordinates. On a 4x4 grid with 300 m spacing and 500 m radio range, 5 slots is mathematically impossible due to the 9-clique lower bound. If 5 slots was intended, either the radio range was lower (excluding diagonals) or the topology was linear or sparse. I treated the brief's sample as an illustrative format example rather than a fixed target. The independent verifier checks physical correctness.",
+        "2. <b>The brief's 5-slot sample:</b> The brief gave partial coordinates (Node_01 at [0, 0], Node_02 at [300, 0], and Node_16 at [900, 900]), consistent with a 4x4 grid at 300 m. However, the sample report showed 5 slots. For the 4x4 grid at 300 m, 5 slots is mathematically impossible because of the 9-clique lower bound. Furthermore, in the sample schedule Node_01 and Node_03 share slot 0 although both are neighbours of Node_02, which the distance-2 rule forbids. I treated the brief's sample as a format example rather than a physical target. The independent verifier checks physical correctness.",
         body_style
     ))
 
