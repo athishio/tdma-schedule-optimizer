@@ -368,7 +368,7 @@ def create_deck(output_path="docs/presentation.pptx"):
     s3 = add_page("My trick: square the graph")
 
     # One sentence text directly on page
-    s3_text = s3.shapes.add_textbox(Inches(1.0), Inches(1.45), Inches(11.333), Inches(0.55))
+    s3_text = s3.shapes.add_textbox(Inches(1.0), Inches(1.50), Inches(11.333), Inches(0.45))
     s3_tf = s3_text.text_frame
     s3_tf.word_wrap = True
     s3_tf.margin_left = s3_tf.margin_top = s3_tf.margin_right = s3_tf.margin_bottom = 0
@@ -379,36 +379,42 @@ def create_deck(output_path="docs/presentation.pptx"):
     p.font.color.rgb = COLOR_INK
 
     # Parameters for 5-node line diagrams
-    nd_dia3 = Inches(0.80)   # Shrink circles to about 0.8 in
-    gap_x   = Inches(0.50)   # At least 0.5 in visible gap between neighbours
+    nd_dia3 = Inches(0.80)   # 0.8 in diameter
+    gap_x   = Inches(0.50)   # 0.5 in gap
     step_x  = nd_dia3 + gap_x # 1.30 in
-    line_y  = Inches(3.95)
+    total_nodes_w = 4 * step_x + nd_dia3 # 6.00 in
+    node_x0 = (Inches(13.333) - total_nodes_w) // 2 # Centred horizontally: ~3.67 in
 
-    # Left diagram: Physical Graph G
-    g_x0 = Inches(0.55)
-    g_title = s3.shapes.add_textbox(g_x0, Inches(2.15), Inches(4.5), Inches(0.45))
-    gt_p = g_title.text_frame.paragraphs[0]
+    # -------------------------------------------------------------------------
+    # Top row: Physical graph G
+    # -------------------------------------------------------------------------
+    top_y = Inches(2.15)
+    g_title = s3.shapes.add_textbox(Inches(0.65), Inches(2.32), Inches(2.85), Inches(0.45))
+    gt_tf = g_title.text_frame
+    gt_tf.word_wrap = False
+    gt_tf.margin_left = gt_tf.margin_top = gt_tf.margin_right = gt_tf.margin_bottom = 0
+    gt_p = gt_tf.paragraphs[0]
     gt_p.text = "Physical graph G"
     gt_p.font.name = FONT_TITLE
-    gt_p.font.size = Pt(24)
+    gt_p.font.size = Pt(20)
     gt_p.font.bold = True
     gt_p.font.color.rgb = COLOR_INK
 
-    left_nodes = [g_x0 + i * step_x for i in range(5)]
+    top_nodes = [node_x0 + i * step_x for i in range(5)]
     # Direct 1-hop links drawn underneath circles
     for i in range(4):
         ln = s3.shapes.add_connector(
             MSO_CONNECTOR.STRAIGHT,
-            left_nodes[i] + nd_dia3 // 2,
-            line_y + nd_dia3 // 2,
-            left_nodes[i+1] + nd_dia3 // 2,
-            line_y + nd_dia3 // 2
+            int(top_nodes[i] + nd_dia3 // 2),
+            int(top_y + nd_dia3 // 2),
+            int(top_nodes[i+1] + nd_dia3 // 2),
+            int(top_y + nd_dia3 // 2)
         )
         ln.line.color.rgb = COLOR_TEAL
         ln.line.width = Pt(3.5)
 
-    for i, nx in enumerate(left_nodes):
-        circ = s3.shapes.add_shape(MSO_SHAPE.OVAL, nx, line_y, nd_dia3, nd_dia3)
+    for i, nx in enumerate(top_nodes):
+        circ = s3.shapes.add_shape(MSO_SHAPE.OVAL, nx, top_y, nd_dia3, nd_dia3)
         circ.fill.solid()
         circ.fill.fore_color.rgb = COLOR_TEAL
         circ.line.fill.background()
@@ -422,67 +428,84 @@ def create_deck(output_path="docs/presentation.pptx"):
         p.font.color.rgb = COLOR_WHITE
         p.alignment = PP_ALIGN.CENTER
 
-    g_sub = s3.shapes.add_textbox(g_x0, line_y + nd_dia3 + Inches(0.25), Inches(5.5), Inches(0.45))
-    g_sub_p = g_sub.text_frame.paragraphs[0]
+    g_sub = s3.shapes.add_textbox(node_x0, top_y + nd_dia3 + Inches(0.08), total_nodes_w, Inches(0.35))
+    g_sub_tf = g_sub.text_frame
+    g_sub_tf.word_wrap = False
+    g_sub_tf.margin_left = g_sub_tf.margin_top = g_sub_tf.margin_right = g_sub_tf.margin_bottom = 0
+    g_sub_p = g_sub_tf.paragraphs[0]
     g_sub_p.text = "Edges where distance \u2264 500 m"
     g_sub_p.font.name = FONT_BODY
-    g_sub_p.font.size = Pt(19)
+    g_sub_p.font.size = Pt(18)
     g_sub_p.font.color.rgb = COLOR_MUTED
+    g_sub_p.alignment = PP_ALIGN.CENTER
 
-    # Center transition label on ONE single line (width 3.60 in)
-    trans = s3.shapes.add_textbox(Inches(4.85), Inches(2.65), Inches(3.60), Inches(0.50))
+    # -------------------------------------------------------------------------
+    # Between rows: down arrow with label "Square it" (amber, one line)
+    # -------------------------------------------------------------------------
+    trans = s3.shapes.add_textbox(node_x0, Inches(3.50), total_nodes_w, Inches(0.45))
     trans_tf = trans.text_frame
     trans_tf.word_wrap = False
     trans_tf.margin_left = trans_tf.margin_top = trans_tf.margin_right = trans_tf.margin_bottom = 0
     tp = trans_tf.paragraphs[0]
-    tp.text = "\u2192 Square it \u2192 G\u00B2"
+    tp.text = "\u2193   Square it"
     tp.font.name = FONT_TITLE
     tp.font.size = Pt(22)
     tp.font.bold = True
     tp.font.color.rgb = COLOR_AMBER
     tp.alignment = PP_ALIGN.CENTER
 
-    # Right diagram: Conflict Graph G^2
-    g2_x0 = Inches(6.75)
-    g2_title = s3.shapes.add_textbox(g2_x0, Inches(2.15), Inches(4.5), Inches(0.45))
-    g2t_p = g2_title.text_frame.paragraphs[0]
+    # -------------------------------------------------------------------------
+    # Bottom row: Conflict graph G²
+    # -------------------------------------------------------------------------
+    bot_y = Inches(4.85)
+    g2_title = s3.shapes.add_textbox(Inches(0.65), Inches(5.02), Inches(2.85), Inches(0.45))
+    g2t_tf = g2_title.text_frame
+    g2t_tf.word_wrap = False
+    g2t_tf.margin_left = g2t_tf.margin_top = g2t_tf.margin_right = g2t_tf.margin_bottom = 0
+    g2t_p = g2t_tf.paragraphs[0]
     g2t_p.text = "Conflict graph G\u00B2"
     g2t_p.font.name = FONT_TITLE
-    g2t_p.font.size = Pt(24)
+    g2t_p.font.size = Pt(20)
     g2t_p.font.bold = True
     g2t_p.font.color.rgb = COLOR_INK
 
-    right_nodes = [g2_x0 + i * step_x for i in range(5)]
+    bot_nodes = [node_x0 + i * step_x for i in range(5)]
     # Direct 1-hop links drawn underneath circles
     for i in range(4):
         ln = s3.shapes.add_connector(
             MSO_CONNECTOR.STRAIGHT,
-            right_nodes[i] + nd_dia3 // 2,
-            line_y + nd_dia3 // 2,
-            right_nodes[i+1] + nd_dia3 // 2,
-            line_y + nd_dia3 // 2
+            int(bot_nodes[i] + nd_dia3 // 2),
+            int(bot_y + nd_dia3 // 2),
+            int(bot_nodes[i+1] + nd_dia3 // 2),
+            int(bot_y + nd_dia3 // 2)
         )
         ln.line.color.rgb = COLOR_TEAL
         ln.line.width = Pt(3.5)
 
-    # Added 2-hop links across top with distinct bridges connecting to nodes
-    hop2_pairs = [(0, 2, Inches(0.55)), (1, 3, Inches(0.95)), (2, 4, Inches(0.55))]
-    for src, dst, arc_offset in hop2_pairs:
-        x1 = right_nodes[src] + nd_dia3 // 2
-        x2 = right_nodes[dst] + nd_dia3 // 2
-        y_top = line_y - arc_offset
-        ln_up = s3.shapes.add_connector(MSO_CONNECTOR.STRAIGHT, x1, line_y, x1, y_top)
+    # Distinct 2-hop arcs: (1-3), (3-5), (2-4)
+    # Each drawn as separate arc with distinct heights so 1-3 and 3-5 do not merge
+    hop2_specs = [
+        (0, 2, Inches(0.35), -int(Inches(0.06)), -int(Inches(0.06))),  # Nodes 1 to 3
+        (2, 4, Inches(0.50),  int(Inches(0.06)),  int(Inches(0.06))),  # Nodes 3 to 5
+        (1, 3, Inches(0.68),  0,                  0),                  # Nodes 2 to 4
+    ]
+    for src, dst, arc_h, x1_off, x2_off in hop2_specs:
+        x1 = int(bot_nodes[src] + nd_dia3 // 2 + x1_off)
+        x2 = int(bot_nodes[dst] + nd_dia3 // 2 + x2_off)
+        y_top = int(bot_y - arc_h)
+        y_bot = int(bot_y + nd_dia3 // 2)
+        ln_up = s3.shapes.add_connector(MSO_CONNECTOR.STRAIGHT, x1, y_bot, x1, y_top)
         ln_up.line.color.rgb = COLOR_AMBER
         ln_up.line.width = Pt(2.5)
         ln_bar = s3.shapes.add_connector(MSO_CONNECTOR.STRAIGHT, x1, y_top, x2, y_top)
         ln_bar.line.color.rgb = COLOR_AMBER
         ln_bar.line.width = Pt(2.5)
-        ln_down = s3.shapes.add_connector(MSO_CONNECTOR.STRAIGHT, x2, y_top, x2, line_y)
+        ln_down = s3.shapes.add_connector(MSO_CONNECTOR.STRAIGHT, x2, y_top, x2, y_bot)
         ln_down.line.color.rgb = COLOR_AMBER
         ln_down.line.width = Pt(2.5)
 
-    for i, nx in enumerate(right_nodes):
-        circ = s3.shapes.add_shape(MSO_SHAPE.OVAL, nx, line_y, nd_dia3, nd_dia3)
+    for i, nx in enumerate(bot_nodes):
+        circ = s3.shapes.add_shape(MSO_SHAPE.OVAL, nx, bot_y, nd_dia3, nd_dia3)
         circ.fill.solid()
         circ.fill.fore_color.rgb = COLOR_TEAL
         circ.line.fill.background()
@@ -496,15 +519,16 @@ def create_deck(output_path="docs/presentation.pptx"):
         p.font.color.rgb = COLOR_WHITE
         p.alignment = PP_ALIGN.CENTER
 
-    g2_sub = s3.shapes.add_textbox(g2_x0, line_y + nd_dia3 + Inches(0.25), Inches(5.5), Inches(0.45))
+    g2_sub = s3.shapes.add_textbox(node_x0, bot_y + nd_dia3 + Inches(0.08), total_nodes_w, Inches(0.35))
     g2_sub_p = g2_sub.text_frame.paragraphs[0]
-    g2_sub_p.text = "1-hop and 2-hop neighbors become adjacent"
+    g2_sub_p.text = "1-hop and 2-hop neighbours become adjacent"
     g2_sub_p.font.name = FONT_BODY
-    g2_sub_p.font.size = Pt(19)
+    g2_sub_p.font.size = Pt(18)
     g2_sub_p.font.color.rgb = COLOR_MUTED
+    g2_sub_p.alignment = PP_ALIGN.CENTER
 
     # Bottom takeaway sentence
-    b3_box = s3.shapes.add_textbox(Inches(1.0), Inches(5.95), Inches(11.333), Inches(0.55))
+    b3_box = s3.shapes.add_textbox(Inches(1.0), Inches(6.30), Inches(11.333), Inches(0.45))
     b3_tf = b3_box.text_frame
     b3_tf.word_wrap = True
     b3_tf.margin_left = b3_tf.margin_top = b3_tf.margin_right = b3_tf.margin_bottom = 0

@@ -26,7 +26,7 @@
 ### Slide 3: My trick: square the graph
 - **Design:** Paper background, thin hairline rule.
 - **Statement:** "Coloring G² is the same as a conflict-free schedule, and nodes 3+ hops apart stay unconnected so they can share a slot."
-- **Visual:** Before and after native diagrams of a 5-node line: physical graph G on the left, squared conflict graph G² on the right with added 2-hop edges.
+- **Visual:** Vertically stacked diagrams of a 5-node line: physical graph G on top, amber "Square it" transition, and squared conflict graph G² below with separate 2-hop arcs.
 - **Spoken Script:** Walkthrough of graph squaring as an algebraic equivalence to distance-2 coloring, showing how 3+ hop separation preserves slot reuse.
 
 ---
