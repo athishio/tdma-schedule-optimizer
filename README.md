@@ -94,7 +94,6 @@ tdma-schedule-optimizer/
   examples/           # Sample topology JSON files and verified grid schedule
   emane/              # EMANE emulation configs, Dockerfile, and translation bridge
   docs/               # Design report PDF and slide deck PPTX
-  tools/              # Scripts to regenerate design.pdf and presentation.pptx
 ```
 
 ## Part 2 (EMANE)
